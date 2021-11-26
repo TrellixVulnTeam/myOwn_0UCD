@@ -15,20 +15,60 @@ class Token:
 
 
 class Event:
-    def __init__(self, name=None, description=None, date=None):
+    def __init__(self, name=None, description=None, date=None, name_entities=None, description_entities=None):
         self.name = name
         self.description = description
         self.date = date
+        self.name_entities = name_entities
+        self.description_entities = description_entities
 
 
 class Event_List:
     def __init__(self):
         self.events_unsorted = {}
         self.events_TBA = []
-        self.events_HOT = []
-        self.events_PREVIOUS = []
-        self.events_TODAY = []
-        self.events_UPCOMING = []
+        self.events_HOT = {}
+        self.events_HOT_unsorted = {}
+        self.events_PREVIOUS = {}
+        self.events_PREVIOUS_unsorted = {}
+        self.events_TODAY = {}
+        self.events_TODAY_unsorted = {}
+        self.events_UPCOMING = {}
+        self.events_UPCOMING_unsorted = {}
+        self.events_types_pair = [[self.events_HOT_unsorted, self.events_HOT],
+                                  [self.events_PREVIOUS_unsorted, self.events_PREVIOUS],
+                                  [self.events_TODAY_unsorted, self.events_TODAY],
+                                  [self.events_UPCOMING_unsorted, self.events_UPCOMING]]
 
-    def add_event(self, event_list, event):
-        event_list.append(event)
+    def sort_out_all_groups(self):
+
+        for events_types in self.events_types_pair:
+            sorted_values = sorted(events_types[0].values())
+
+            for i in sorted_values:
+                for k in events_types[0].keys():
+                    if events_types[0][k] == i:
+                        events_types[1][k] = events_types[0][k]
+                        break
+
+
+class Message_Mem:
+    def __init__(self):
+        self.last_message = {}
+        self.list_messages = []
+
+
+async def check_repeated_message(bot, message, last_message):
+    if message.chat.id in last_message.last_message.keys():
+        last_message_start_id = last_message.last_message.get(message.chat.id)
+        if message.message_id + 1 - 300 > last_message_start_id:
+            last_message.last_message[message.chat.id] = message.message_id + 1
+        elif message.message_id + 1 - 300 <= last_message_start_id:
+            try:
+                await bot.delete_message(message.chat.id, last_message.last_message[message.chat.id])
+            except:
+                last_message.last_message[message.chat.id] = message.message_id + 1
+            else:
+                last_message.last_message[message.chat.id] = message.message_id + 1
+    else:
+        last_message.last_message[message.chat.id] = message.message_id + 1

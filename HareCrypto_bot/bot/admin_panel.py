@@ -3,26 +3,19 @@ from datetime import datetime
 import sqlite3
 import shelve
 
+from aiogram.utils.json import json
+
 import files
 from extensions import Event
 from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
-    InlineKeyboardMarkup, InlineKeyboardButton
+    InlineKeyboardMarkup, InlineKeyboardButton, MessageEntity
 
-from bot import config
+import config
+from defs import get_admin_list, log, user_logger, new_admin, get_state, del_id, get_moder_list, new_moder
 
 creation_event = Event()
 edition_event = Event()
-
-
-async def log(text):
-    time = str(datetime.now())
-    try:
-        with open(files.working_log, 'a', encoding='utf-8') as f:
-            f.write(time + '    | ' + text + '\n')
-    except:
-        with open(files.working_log, 'w', encoding='utf-8') as f:
-            f.write(time + '    | ' + text + '\n')
 
 
 async def first_launch(bot, chat_id):
@@ -38,6 +31,7 @@ async def admin_panel(bot, chat_id, first__launch=False):
     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
     user_markup.row('События')
     user_markup.row('Список пользователей')
+    user_markup.row('Список модераторов')
     user_markup.row('Список админов')
     user_markup.row('Скачать лог файл')
     if first__launch:
@@ -45,56 +39,142 @@ async def admin_panel(bot, chat_id, first__launch=False):
         В следующий раз чтобы войти в админ панель введите команду '/adm'.
         """, parse_mode='MarkDown', reply_markup=user_markup)
         new_admin(chat_id)
-        await log(f'First launch admin panel of bot by admin {chat_id}')  # логгируется первый запуск get_adminlist
+        await log(f'First launch admin panel of bot by admin {chat_id}')
     else:
         await bot.send_message(chat_id, """ Добро пожаловать в админ панель.
         """, parse_mode='MarkDown', reply_markup=user_markup)
 
-        await log(f'Launch admin panel of bot by admin {chat_id}')  # логгируется первый запуск get_adminlist
+        await log(f'Launch admin panel of bot by admin {chat_id}')
 
 
-async def in_admin_panel(bot, chat_id, message_text):
-
-    if chat_id in get_adminlist():
-        if message_text == 'Вернуться в главное меню' or message_text == '/adm':
+async def in_admin_panel(bot, chat_id, message):
+    if chat_id in get_admin_list():
+        if message.text == 'Вернуться в главное меню' or message.text == '/adm':
             if get_state(chat_id) is True:
                 with shelve.open(files.state_bd) as bd: del bd[str(chat_id)]
             user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
             user_markup.row('События')
             user_markup.row('Список пользователей')
+            user_markup.row('Список модераторов')
             user_markup.row('Список админов')
             user_markup.row('Скачать лог файл')
             await bot.send_message(chat_id, 'Вы вошли в админку бота!\nЧтобы выйти из неё, нажмите /start',
                                    reply_markup=user_markup)
 
-        elif message_text == 'События':
+        elif message.text == 'События':
             user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
             user_markup.row('Добавить новое событие', 'Удалить событие')
             user_markup.row('Редактирование событий')
             user_markup.row('Вернуться в главное меню')
 
+            # print(len("Созданые события:\n\n1. name - TBA МСК - description"))
+
+            entity_list = []
+            last_offset = 0
+            last_length = 0
+            count_string_track = 22
             con = sqlite3.connect(files.main_db)
             cursor = con.cursor()
             events = 'Созданые события:\n\n'
             a = 0
             try:
-                cursor.execute("SELECT name, description, date FROM events;")
+                cursor.execute("SELECT name, description, date, name_entities, description_entities FROM events;")
             except:
                 cursor.execute("CREATE TABLE events (id INT, name TEXT, "
-                               "description TEXT, date DATETIME);")
+                               "description TEXT, date DATETIME, name_entities JSON, description_entities JSON);")
             else:
-                for name, description, date in cursor.fetchall():
+                for name, description, date, name_entities, description_entities in cursor.fetchall():
                     a += 1
-                    events += name + ' - ' + str(date) + ' МСК - ' + description + '\n'
+
+                    name_entities = json.loads(name_entities)
+                    description_entities = json.loads(description_entities)
+                    # print("1 " + str(name_entities))
+                    # print("2 " + str(description_entities))
+
+                    if "entities" in name_entities:
+                        # print("3 " + str(name_entities["entities"]))
+
+                        for entity in name_entities["entities"]:
+                            entity_values_list = list(entity.values())
+
+                            if entity["type"] == "text_link":
+                                # print("4 " + str(entity_values_list))
+                                entity = MessageEntity(type=entity_values_list[0],
+                                                       offset=count_string_track + entity_values_list[1],
+                                                       length=entity_values_list[2], url=entity_values_list[3])
+                                entity_list.append(entity)
+                            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
+                                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
+                                    (entity["type"] == "bot_command") or \
+                                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
+                                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
+                                    (entity["type"] == "underline") or (entity["type"] == "strikethrough"):
+                                # print("5 " + str(entity_values_list))
+                                entity = MessageEntity(type=entity_values_list[0],
+                                                       offset=count_string_track + entity_values_list[1],
+                                                       length=entity_values_list[2])
+                                entity_list.append(entity)
+
+                            last_offset = count_string_track + entity_values_list[1]
+                            # print("last_offset " + str(last_offset))
+                            last_length = entity_values_list[2]
+                            # print("last_length " + str(last_length))
+
+                        count_string_track = last_offset + last_length + 3 + len(str(date)) + 7
+                        # print("6 " + str(count_string_track))
+                    else:
+                        count_string_track += len(name) + 3 + len(str(date)) + 7
+                        # print("count " + str(count_string_track))
+
+                    if "entities" in description_entities:
+                        # print("7 " + str(description_entities["entities"]))
+
+                        for entity in description_entities["entities"]:
+                            entity_values_list = list(entity.values())
+
+                            if entity["type"] == "text_link":
+                                # print("8 " + str(entity_values_list))
+                                entity = MessageEntity(type=entity_values_list[0],
+                                                       offset=count_string_track + entity_values_list[1],
+                                                       length=entity_values_list[2], url=entity_values_list[3])
+                                entity_list.append(entity)
+                            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
+                                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
+                                    (entity["type"] == "bot_command") or \
+                                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
+                                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
+                                    (entity["type"] == "underline") or (entity["type"] == "strikethrough"):
+                                # print("9 " + str(entity_values_list))
+                                entity = MessageEntity(type=entity_values_list[0],
+                                                       offset=count_string_track + entity_values_list[1],
+                                                       length=entity_values_list[2])
+                                entity_list.append(entity)
+
+                            last_offset = count_string_track + entity_values_list[1]
+                            # print("last_offset " + str(last_offset))
+                            last_length = entity_values_list[2]
+                            # print("last_length " + str(last_length))
+
+                        count_string_track = last_offset + last_length + 4
+                        # print("10 " + str(count_string_track))
+                    else:
+                        count_string_track += len(description) + 4
+                        # print("count " + str(count_string_track))
+
+                    # print("11 " + str(count_string_track))
+
+                    # print("12 " + str(entity_list))
+                    events += str(a) + '. ' + name + ' - ' + str(date) + ' МСК - ' + description + '\n'
+
                 con.close()
 
             if a == 0:
                 events = "События не созданы!"
             else:
                 pass
-            await bot.send_message(chat_id, events, reply_markup=user_markup, parse_mode='Markdown')
+            await bot.send_message(chat_id, events, reply_markup=user_markup, entities=entity_list)
 
-        elif message_text == 'Добавить новое событие':
+        elif message.text == 'Добавить новое событие':
             key = InlineKeyboardMarkup()
             key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню админки',
                                          callback_data='Вернуться в главное меню админки'))
@@ -102,7 +182,7 @@ async def in_admin_panel(bot, chat_id, message_text):
             with shelve.open(files.state_bd) as bd:
                 bd[str(chat_id)] = 2
 
-        elif message_text == 'Редактирование событий':
+        elif message.text == 'Редактирование событий':
             con = sqlite3.connect(files.main_db)
             cursor = con.cursor()
             cursor.execute("SELECT name, date FROM events;")
@@ -121,7 +201,7 @@ async def in_admin_panel(bot, chat_id, message_text):
                     bd[str(chat_id)] = 7
             con.close()
 
-        elif message_text == 'Изменить название':
+        elif message.text == 'Изменить название':
             if get_state(chat_id) is True:
                 with shelve.open(files.state_bd) as bd:
                     state_num = bd[str(chat_id)]
@@ -142,7 +222,7 @@ async def in_admin_panel(bot, chat_id, message_text):
                             bd[str(chat_id)] = 9
                     con.close()
 
-        elif message_text == 'Изменить описание':
+        elif message.text == 'Изменить описание':
             if get_state(chat_id) is True:
                 with shelve.open(files.state_bd) as bd:
                     state_num = bd[str(chat_id)]
@@ -163,7 +243,7 @@ async def in_admin_panel(bot, chat_id, message_text):
                             bd[str(chat_id)] = 10
                     con.close()
 
-        elif message_text == 'Изменить дату':
+        elif message.text == 'Изменить дату':
             if get_state(chat_id) is True:
                 with shelve.open(files.state_bd) as bd:
                     state_num = bd[str(chat_id)]
@@ -184,7 +264,7 @@ async def in_admin_panel(bot, chat_id, message_text):
                             bd[str(chat_id)] = 11
                     con.close()
 
-        elif message_text == 'Удалить событие':
+        elif message.text == 'Удалить событие':
             con = sqlite3.connect(files.main_db)
             cursor = con.cursor()
             cursor.execute("SELECT name, date FROM events;")
@@ -203,16 +283,16 @@ async def in_admin_panel(bot, chat_id, message_text):
                     bd[str(chat_id)] = 6
             con.close()
 
-        elif message_text == 'Список админов':
+        elif message.text == 'Список админов':
             admins = "Список админов:\n\n"
-            for admin in get_adminlist():
+            for admin in get_admin_list():
                 admins += f"{admin}\n"
             user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
             user_markup.row('Добавить нового админа', 'Удалить админа')
             user_markup.row('Вернуться в главное меню')
             await bot.send_message(chat_id, admins, reply_markup=user_markup)
 
-        elif message_text == 'Добавить нового админа':
+        elif message.text == 'Добавить нового админа':
             key = InlineKeyboardMarkup()
             key.add(InlineKeyboardButton('Отменить и вернуться в главное меню админки',
                                          callback_data='Вернуться в главное меню админки'))
@@ -220,10 +300,10 @@ async def in_admin_panel(bot, chat_id, message_text):
             with shelve.open(files.state_bd) as bd:
                 bd[str(chat_id)] = 21
 
-        elif message_text == 'Удалить админа':
+        elif message.text == 'Удалить админа':
             user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
             a = 0
-            for admin_id in get_adminlist():
+            for admin_id in get_admin_list():
                 a += 1
                 if int(admin_id) != config.admin_id: user_markup.row(str(admin_id))
             if a == 1:
@@ -234,7 +314,39 @@ async def in_admin_panel(bot, chat_id, message_text):
                 with shelve.open(files.state_bd) as bd:
                     bd[str(chat_id)] = 22
 
-        elif message_text == 'Список пользователей':
+        elif message.text == 'Список модераторов':
+            moders = "Список модераторов:\n\n"
+            for moder in get_moder_list():
+                moders += f"{moder}\n"
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            user_markup.row('Добавить нового модератора', 'Удалить модератора')
+            user_markup.row('Вернуться в главное меню')
+            await bot.send_message(chat_id, moders, reply_markup=user_markup)
+
+        elif message.text == 'Добавить нового модератора':
+            key = InlineKeyboardMarkup()
+            key.add(InlineKeyboardButton('Отменить и вернуться в главное меню админки',
+                                         callback_data='Вернуться в главное меню админки'))
+            await bot.send_message(chat_id, 'Введите id нового модератора', reply_markup=key)
+            with shelve.open(files.state_bd) as bd:
+                bd[str(chat_id)] = 31
+
+        elif message.text == 'Удалить модератора':
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            a = 0
+            for moder_id in get_moder_list():
+                a += 1
+                user_markup.row(str(moder_id))
+            if a == 0:
+                await bot.send_message(chat_id, 'Вы ещё не добавляли модераторов!')
+            else:
+                user_markup.row('Вернуться в главное меню')
+                await bot.send_message(chat_id, 'Выбери id модератора, которого нужно удалить',
+                                       reply_markup=user_markup)
+                with shelve.open(files.state_bd) as bd:
+                    bd[str(chat_id)] = 32
+
+        elif message.text == 'Список пользователей':
             get_list = 0
             users = "Список пользователей:\n\n"
             for user in user_logger(get_list):
@@ -243,7 +355,7 @@ async def in_admin_panel(bot, chat_id, message_text):
             user_markup.row('Вернуться в главное меню')
             await bot.send_message(chat_id, users, reply_markup=user_markup)
 
-        elif message_text == 'Скачать лог файл':
+        elif message.text == 'Скачать лог файл':
             working_log = open(files.working_log, 'rb')
             await bot.send_document(chat_id, working_log)
             working_log.close()
@@ -253,16 +365,27 @@ async def in_admin_panel(bot, chat_id, message_text):
                 state_num = bd[str(chat_id)]
 
             if state_num == 2:
-                creation_event.name = message_text
+                creation_event.name = message.text
+                # print(message)
+                # print(message.text)
+                # print(message.entities)
+
+                creation_event.name_entities = message
+
                 key = InlineKeyboardMarkup()
                 key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню админки',
                                              callback_data='Вернуться в главное меню админки'))
-                await bot.send_message(chat_id, f'Введите описание для {message_text}', reply_markup=key)
+                await bot.send_message(chat_id, f'Введите описание для {message.text}', reply_markup=key)
                 with shelve.open(files.state_bd) as bd:
                     bd[str(chat_id)] = 3
 
             elif state_num == 3:
-                creation_event.description = message_text
+                creation_event.description = message.text
+                # print(message.text)
+                # print(message.entities)
+
+                creation_event.description_entities = message
+
                 key = InlineKeyboardMarkup()
                 key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню админки',
                                              callback_data='Вернуться в главное меню админки'))
@@ -271,13 +394,15 @@ async def in_admin_panel(bot, chat_id, message_text):
                     bd[str(chat_id)] = 4
 
             elif state_num == 4:
-                creation_event.date = message_text
+                creation_event.date = message.text
                 if creation_event.date == 'TBA':
                     con = sqlite3.connect(files.main_db)
                     cursor = con.cursor()
-                    cursor.execute("INSERT INTO events (name, description, date) VALUES " +
-                                   "('" + creation_event.name + "', '" + creation_event.description + "', '" +
-                                   creation_event.date + "')")
+                    cursor.execute("INSERT INTO events (name, description, date, name_entities, " +
+                                   "description_entities) VALUES " + "('" + str(creation_event.name) + "', '" +
+                                   str(creation_event.description) + "', '" + str(creation_event.date) + "', '" +
+                                   str(creation_event.name_entities) + "', '" +
+                                   str(creation_event.description_entities) + "')")
                     con.commit()
                     con.close()
                     key = InlineKeyboardMarkup()
@@ -289,7 +414,7 @@ async def in_admin_panel(bot, chat_id, message_text):
                         del bd[str(chat_id)]
                 else:
                     try:
-                        datetime.strptime(message_text, "%d.%m.%Y %H:%M")
+                        datetime.strptime(message.text, "%d.%m.%Y %H:%M")
                     except:
                         await bot.send_message(chat_id, 'Вы ввели дату в неправильном формате!')
                         key = InlineKeyboardMarkup()
@@ -300,9 +425,11 @@ async def in_admin_panel(bot, chat_id, message_text):
                     else:
                         con = sqlite3.connect(files.main_db)
                         cursor = con.cursor()
-                        cursor.execute("INSERT INTO events (name, description, date) VALUES " +
-                                       "('" + creation_event.name + "', '" + creation_event.description + "', '" +
-                                       creation_event.date + "')")
+                        cursor.execute("INSERT INTO events (name, description, date, name_entities," +
+                                       " description_entities)  VALUES " +
+                                       "('" + str(creation_event.name) + "', '" + str(creation_event.description) +
+                                       "', '" + str(creation_event.date) + "', '" + str(creation_event.name_entities) +
+                                       "', '" + str(creation_event.description_entities) + "')")
                         con.commit()
                         con.close()
                         key = InlineKeyboardMarkup()
@@ -317,21 +444,21 @@ async def in_admin_panel(bot, chat_id, message_text):
                 con = sqlite3.connect(files.main_db)
                 cursor = con.cursor()
                 a = 0
-                cursor.execute("SELECT description FROM events WHERE name = " + "'" + message_text + "'")
+                cursor.execute("SELECT description FROM events WHERE name = " + "'" + message.text + "'")
                 for i in cursor.fetchall(): a += 1
                 if a == 0:
                     await bot.send_message(chat_id,
                                            'Выбранного события не обнаружено! '
                                            'Выберите его, нажав на соотвествующую кнопку')
                 else:
-                    cursor.execute("DELETE FROM events WHERE name = " + "'" + message_text + "';")
+                    cursor.execute("DELETE FROM events WHERE name = " + "'" + message.text + "';")
                     con.commit()
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                     user_markup.row('Добавить новое событие', 'Удалить событие')
                     user_markup.row('Редактирование событий')
                     user_markup.row('Вернуться в главное меню')
                     await bot.send_message(chat_id, 'Событие успешно удалено!', reply_markup=user_markup)
-                    await log(f'Event {message_text} is deleted by {chat_id}')
+                    await log(f'Event {message.text} is deleted by {chat_id}')
                     with shelve.open(files.state_bd) as bd:
                         del bd[str(chat_id)]
                 con.close()
@@ -340,13 +467,13 @@ async def in_admin_panel(bot, chat_id, message_text):
                 con = sqlite3.connect(files.main_db)
                 cursor = con.cursor()
                 a = 0
-                cursor.execute("SELECT name FROM events WHERE name = " + "'" + message_text + "';")
+                cursor.execute("SELECT name FROM events WHERE name = " + "'" + message.text + "';")
                 for i in cursor.fetchall(): a += 1
 
                 if a == 0:
                     await bot.send_message(chat_id, 'События с таким названием нет!\nВыберите заново!')
                 else:
-                    edition_event.name = message_text
+                    edition_event.name = message.text
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                     user_markup.row('Изменить название', 'Изменить описание')
                     user_markup.row('Изменить дату')
@@ -359,8 +486,8 @@ async def in_admin_panel(bot, chat_id, message_text):
             elif state_num == 9:
                 con = sqlite3.connect(files.main_db)
                 cursor = con.cursor()
-                cursor.execute("UPDATE events SET name = '" + message_text + "' WHERE name = '" +
-                               edition_event.name + "';")
+                cursor.execute("UPDATE events SET name = '" + message.text + "', name_entities = '" +
+                               str(message) + "' " + "WHERE name = '" + edition_event.name + "';")
                 con.commit()
                 con.close()
 
@@ -376,8 +503,9 @@ async def in_admin_panel(bot, chat_id, message_text):
             elif state_num == 10:
                 con = sqlite3.connect(files.main_db)
                 cursor = con.cursor()
-                cursor.execute("UPDATE events SET description = '" + message_text + "' WHERE name = '" +
-                               edition_event.name + "';")
+                cursor.execute("UPDATE events SET description = '" + message.text +
+                               "', description_entities = '" + str(message) + "' " +
+                               "WHERE name = '" + edition_event.name + "';")
                 con.commit()
                 con.close()
 
@@ -393,7 +521,7 @@ async def in_admin_panel(bot, chat_id, message_text):
             elif state_num == 11:
                 con = sqlite3.connect(files.main_db)
                 cursor = con.cursor()
-                cursor.execute("UPDATE events SET date = '" + message_text + "' WHERE name = '" +
+                cursor.execute("UPDATE events SET date = '" + message.text + "' WHERE name = '" +
                                edition_event.name + "';")
                 con.commit()
                 con.close()
@@ -408,21 +536,21 @@ async def in_admin_panel(bot, chat_id, message_text):
                     bd[str(chat_id)] = 8
 
             elif state_num == 21:
-                new_admin(message_text)
+                new_admin(message.text)
                 user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                 user_markup.row('Добавить нового админа', 'Удалить админа')
                 user_markup.row('Вернуться в главное меню')
                 await bot.send_message(chat_id, 'Новый админ успешно добавлен', reply_markup=user_markup)
-                await log(f'New admin {message_text} is added by {chat_id}')
+                await log(f'New admin {message.text} is added by {chat_id}')
                 with shelve.open(files.state_bd) as bd:
                     del bd[str(chat_id)]
 
             elif state_num == 22:
                 with open(files.admins_list, encoding='utf-8') as f:
-                    if str(message_text) in f.read():
-                        del_id(files.admins_list, message_text)
+                    if str(message.text) in f.read():
+                        del_id(files.admins_list, message.text)
                         await bot.send_message(chat_id, 'Админ успешно удалён из списка')
-                        await log(f'The admin {message_text} is removed by {chat_id}')
+                        await log(f'The admin {message.text} is removed by {chat_id}')
                         with shelve.open(files.state_bd) as bd:
                             del bd[str(chat_id)]
                     else:
@@ -430,6 +558,30 @@ async def in_admin_panel(bot, chat_id, message_text):
                                                         'Выберите правильный id!')
                         with shelve.open(files.state_bd) as bd:
                             bd[str(chat_id)] = 22
+
+            elif state_num == 31:
+                new_moder(message.text)
+                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                user_markup.row('Добавить нового модератора', 'Удалить модератора')
+                user_markup.row('Вернуться в главное меню')
+                await bot.send_message(chat_id, 'Новый модератор успешно добавлен', reply_markup=user_markup)
+                await log(f'New moder {message.text} is added by {chat_id}')
+                with shelve.open(files.state_bd) as bd:
+                    del bd[str(chat_id)]
+
+            elif state_num == 32:
+                with open(files.moders_list, encoding='utf-8') as f:
+                    if str(message.text) in f.read():
+                        del_id(files.moders_list, message.text)
+                        await bot.send_message(chat_id, 'Модератор успешно удалён из списка')
+                        await log(f'The moder {message.text} is removed by {chat_id}')
+                        with shelve.open(files.state_bd) as bd:
+                            del bd[str(chat_id)]
+                    else:
+                        await bot.send_message(chat_id, 'Такого id в списках модераторов не обнаружено! '
+                                                        'Выберите правильный id!')
+                        with shelve.open(files.state_bd) as bd:
+                            bd[str(chat_id)] = 32
 
 
 async def admin_inline(bot, callback_data, chat_id, message_id):
@@ -444,61 +596,3 @@ async def admin_inline(bot, callback_data, chat_id, message_id):
         await bot.delete_message(chat_id, message_id)  # удаляется старое сообщение
         await bot.send_message(chat_id, 'Вы вошли в админку бота!\nЧтобы выйти из неё, нажмите /start',
                                reply_markup=user_markup)
-
-
-def get_adminlist():
-    admins_list = []
-    with open(files.admins_list, encoding='utf-8') as f:
-        for admin_id in f.readlines():
-            admins_list.append(int(admin_id))
-    return admins_list
-
-
-def new_admin(his_id):
-    with open(files.admins_list, encoding='utf-8') as f:
-        if not str(his_id) in f.read():
-            with open(files.admins_list, 'a', encoding='utf-8') as f: f.write(str(his_id) + '\n')
-
-
-def get_state(chat_id):
-    with shelve.open(files.state_bd) as bd:
-        if str(chat_id) in bd: return True
-
-
-def user_logger(chat_id):
-    if chat_id == 0:
-        users_list = []
-        with open(files.users_list, encoding='utf-8') as f:
-            for user_id in f.readlines():
-                users_list.append(int(user_id))
-        return users_list
-    else:
-        if chat_id not in get_adminlist():
-            with open(files.users_list, encoding='utf-8') as f:
-                if not str(chat_id) in f.read():
-                    with open(files.users_list, 'a', encoding='utf-8') as f: f.write(str(chat_id) + '\n')
-
-
-def new_blockuser(his_id):
-    with open(files.blockusers_list, 'w', encoding='utf-8') as f: return f.write(str(his_id) + '\n')
-
-
-def check_message(message):
-    with shelve.open(files.bot_message_bd) as bd:
-        if message in bd:
-            return True
-        else:
-            return False
-
-
-def del_id(file, chat_id):
-    text = ''
-    with open(file, encoding='utf-8') as f:
-        for i in f.readlines():
-            i = i[:len(i) - 1]
-            if str(chat_id) == i:
-                pass
-            else:
-                text += i + '\n'
-    with open(file, 'w', encoding='utf-8') as f:
-        f.write(text)
