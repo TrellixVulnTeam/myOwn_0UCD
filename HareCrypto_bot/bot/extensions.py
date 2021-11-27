@@ -43,13 +43,7 @@ class Event_List:
     def sort_out_all_groups(self):
 
         for events_types in self.events_types_pair:
-            sorted_values = sorted(events_types[0].values())
-
-            for i in sorted_values:
-                for k in events_types[0].keys():
-                    if events_types[0][k] == i:
-                        events_types[1][k] = events_types[0][k]
-                        break
+            events_types[1] = dict(sorted(events_types[0].items(), key=lambda item: item[1]))
 
 
 class Message_Mem:

@@ -67,12 +67,8 @@ async def in_admin_panel(bot, chat_id, message):
             user_markup.row('Редактирование событий')
             user_markup.row('Вернуться в главное меню')
 
-            # print(len("Созданые события:\n\n1. name - TBA МСК - description"))
-
             entity_list = []
-            last_offset = 0
-            last_length = 0
-            count_string_track = 22
+            count_string_track = 19
             con = sqlite3.connect(files.main_db)
             cursor = con.cursor()
             events = 'Созданые события:\n\n'
@@ -85,20 +81,16 @@ async def in_admin_panel(bot, chat_id, message):
             else:
                 for name, description, date, name_entities, description_entities in cursor.fetchall():
                     a += 1
-
+                    count_string_track += len(str(a)) + 2
                     name_entities = json.loads(name_entities)
                     description_entities = json.loads(description_entities)
-                    # print("1 " + str(name_entities))
-                    # print("2 " + str(description_entities))
 
                     if "entities" in name_entities:
-                        # print("3 " + str(name_entities["entities"]))
 
                         for entity in name_entities["entities"]:
                             entity_values_list = list(entity.values())
 
                             if entity["type"] == "text_link":
-                                # print("4 " + str(entity_values_list))
                                 entity = MessageEntity(type=entity_values_list[0],
                                                        offset=count_string_track + entity_values_list[1],
                                                        length=entity_values_list[2], url=entity_values_list[3])
@@ -108,32 +100,21 @@ async def in_admin_panel(bot, chat_id, message):
                                     (entity["type"] == "bot_command") or \
                                     (entity["type"] == "email") or (entity["type"] == "phone_number") or \
                                     (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                                    (entity["type"] == "underline") or (entity["type"] == "strikethrough"):
-                                # print("5 " + str(entity_values_list))
+                                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
+                                    or (entity["type"] == "code"):
                                 entity = MessageEntity(type=entity_values_list[0],
                                                        offset=count_string_track + entity_values_list[1],
                                                        length=entity_values_list[2])
                                 entity_list.append(entity)
 
-                            last_offset = count_string_track + entity_values_list[1]
-                            # print("last_offset " + str(last_offset))
-                            last_length = entity_values_list[2]
-                            # print("last_length " + str(last_length))
-
-                        count_string_track = last_offset + last_length + 3 + len(str(date)) + 7
-                        # print("6 " + str(count_string_track))
-                    else:
-                        count_string_track += len(name) + 3 + len(str(date)) + 7
-                        # print("count " + str(count_string_track))
+                    count_string_track += len(name) + 3 + len(str(date)) + 7
 
                     if "entities" in description_entities:
-                        # print("7 " + str(description_entities["entities"]))
 
                         for entity in description_entities["entities"]:
                             entity_values_list = list(entity.values())
 
                             if entity["type"] == "text_link":
-                                # print("8 " + str(entity_values_list))
                                 entity = MessageEntity(type=entity_values_list[0],
                                                        offset=count_string_track + entity_values_list[1],
                                                        length=entity_values_list[2], url=entity_values_list[3])
@@ -143,28 +124,16 @@ async def in_admin_panel(bot, chat_id, message):
                                     (entity["type"] == "bot_command") or \
                                     (entity["type"] == "email") or (entity["type"] == "phone_number") or \
                                     (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                                    (entity["type"] == "underline") or (entity["type"] == "strikethrough"):
-                                # print("9 " + str(entity_values_list))
+                                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
+                                    or (entity["type"] == "code"):
                                 entity = MessageEntity(type=entity_values_list[0],
                                                        offset=count_string_track + entity_values_list[1],
                                                        length=entity_values_list[2])
                                 entity_list.append(entity)
 
-                            last_offset = count_string_track + entity_values_list[1]
-                            # print("last_offset " + str(last_offset))
-                            last_length = entity_values_list[2]
-                            # print("last_length " + str(last_length))
+                    count_string_track += len(description) + 1
 
-                        count_string_track = last_offset + last_length + 4
-                        # print("10 " + str(count_string_track))
-                    else:
-                        count_string_track += len(description) + 4
-                        # print("count " + str(count_string_track))
-
-                    # print("11 " + str(count_string_track))
-
-                    # print("12 " + str(entity_list))
-                    events += str(a) + '. ' + name + ' - ' + str(date) + ' МСК - ' + description + '\n'
+                    events += str(a) + '. ' + str(name) + ' - ' + str(date) + ' МСК - ' + str(description) + '\n'
 
                 con.close()
 
@@ -286,11 +255,11 @@ async def in_admin_panel(bot, chat_id, message):
         elif message.text == 'Список админов':
             admins = "Список админов:\n\n"
             for admin in get_admin_list():
-                admins += f"{admin}\n"
+                admins += f"<a href='tg://user?id={admin}'>{admin}</a>\n"
             user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
             user_markup.row('Добавить нового админа', 'Удалить админа')
             user_markup.row('Вернуться в главное меню')
-            await bot.send_message(chat_id, admins, reply_markup=user_markup)
+            await bot.send_message(chat_id, admins, reply_markup=user_markup, parse_mode="HTML")
 
         elif message.text == 'Добавить нового админа':
             key = InlineKeyboardMarkup()
@@ -317,11 +286,11 @@ async def in_admin_panel(bot, chat_id, message):
         elif message.text == 'Список модераторов':
             moders = "Список модераторов:\n\n"
             for moder in get_moder_list():
-                moders += f"{moder}\n"
+                moders += f"<a href='tg://user?id={moder}'>{moder}</a>\n"
             user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
             user_markup.row('Добавить нового модератора', 'Удалить модератора')
             user_markup.row('Вернуться в главное меню')
-            await bot.send_message(chat_id, moders, reply_markup=user_markup)
+            await bot.send_message(chat_id, moders, reply_markup=user_markup, parse_mode="HTML")
 
         elif message.text == 'Добавить нового модератора':
             key = InlineKeyboardMarkup()
@@ -350,10 +319,10 @@ async def in_admin_panel(bot, chat_id, message):
             get_list = 0
             users = "Список пользователей:\n\n"
             for user in user_logger(get_list):
-                users += f"{user}\n"
+                users += f"<a href='tg://user?id={user}'>{user}</a>\n"
             user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
             user_markup.row('Вернуться в главное меню')
-            await bot.send_message(chat_id, users, reply_markup=user_markup)
+            await bot.send_message(chat_id, users, reply_markup=user_markup, parse_mode="HTML")
 
         elif message.text == 'Скачать лог файл':
             working_log = open(files.working_log, 'rb')
@@ -366,10 +335,6 @@ async def in_admin_panel(bot, chat_id, message):
 
             if state_num == 2:
                 creation_event.name = message.text
-                # print(message)
-                # print(message.text)
-                # print(message.entities)
-
                 creation_event.name_entities = message
 
                 key = InlineKeyboardMarkup()
@@ -381,9 +346,6 @@ async def in_admin_panel(bot, chat_id, message):
 
             elif state_num == 3:
                 creation_event.description = message.text
-                # print(message.text)
-                # print(message.entities)
-
                 creation_event.description_entities = message
 
                 key = InlineKeyboardMarkup()
@@ -519,21 +481,48 @@ async def in_admin_panel(bot, chat_id, message):
                     bd[str(chat_id)] = 8
 
             elif state_num == 11:
-                con = sqlite3.connect(files.main_db)
-                cursor = con.cursor()
-                cursor.execute("UPDATE events SET date = '" + message.text + "' WHERE name = '" +
-                               edition_event.name + "';")
-                con.commit()
-                con.close()
+                if message.text == 'TBA':
+                    con = sqlite3.connect(files.main_db)
+                    cursor = con.cursor()
+                    cursor.execute("UPDATE events SET date = '" + message.text + "' WHERE name = '" +
+                                   edition_event.name + "';")
+                    con.commit()
+                    con.close()
 
-                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
-                user_markup.row('Изменить название', 'Изменить описание')
-                user_markup.row('Изменить дату')
-                user_markup.row('Вернуться в главное меню')
-                await bot.send_message(chat_id, 'Дата события успешно изменена!', reply_markup=user_markup)
-                await log(f'Date event {edition_event.name} is changed by {chat_id}')
-                with shelve.open(files.state_bd) as bd:
-                    bd[str(chat_id)] = 8
+                    user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                    user_markup.row('Изменить название', 'Изменить описание')
+                    user_markup.row('Изменить дату')
+                    user_markup.row('Вернуться в главное меню')
+                    await bot.send_message(chat_id, 'Дата события успешно изменена!', reply_markup=user_markup)
+                    await log(f'Date event {edition_event.name} is changed by {chat_id}')
+                    with shelve.open(files.state_bd) as bd:
+                        bd[str(chat_id)] = 8
+                else:
+                    try:
+                        datetime.strptime(message.text, "%d.%m.%Y %H:%M")
+                    except:
+                        await bot.send_message(chat_id, 'Вы ввели дату в неправильном формате!')
+                        key = InlineKeyboardMarkup()
+                        key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню админки',
+                                                     callback_data='Вернуться в главное меню админки'))
+                        await bot.send_message(chat_id, 'Введите дату события (в формате ДД.ММ.ГГГГ ЧЧ:ММ):',
+                                               reply_markup=key)
+                    else:
+                        con = sqlite3.connect(files.main_db)
+                        cursor = con.cursor()
+                        cursor.execute("UPDATE events SET date = '" + message.text + "' WHERE name = '" +
+                                       edition_event.name + "';")
+                        con.commit()
+                        con.close()
+
+                        user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                        user_markup.row('Изменить название', 'Изменить описание')
+                        user_markup.row('Изменить дату')
+                        user_markup.row('Вернуться в главное меню')
+                        await bot.send_message(chat_id, 'Дата события успешно изменена!', reply_markup=user_markup)
+                        await log(f'Date event {edition_event.name} is changed by {chat_id}')
+                        with shelve.open(files.state_bd) as bd:
+                            bd[str(chat_id)] = 8
 
             elif state_num == 21:
                 new_admin(message.text)
