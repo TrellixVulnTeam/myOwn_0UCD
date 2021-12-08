@@ -5,7 +5,7 @@ from datetime import datetime
 from aiogram.utils.json import json
 
 import files
-from defs import get_moder_list, get_state, new_moder, log
+from defs import get_moder_list, get_state, log, mailing
 from extensions import Event
 from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
@@ -43,20 +43,20 @@ async def in_moder_panel(bot, chat_id, message):
             user_markup.row('Вернуться в главное меню')
 
             entity_list = []
-            last_offset = 0
-            last_length = 0
             count_string_track = 19
             con = sqlite3.connect(files.main_db)
             cursor = con.cursor()
             events = 'Созданые события:\n\n'
             a = 0
             try:
-                cursor.execute("SELECT name, description, date, name_entities, description_entities FROM events;")
+                cursor.execute("SELECT name, description, date, name_entities, description_entities, "
+                               "type_event FROM events;")
             except:
                 cursor.execute("CREATE TABLE events (id INT, name TEXT, "
-                               "description TEXT, date DATETIME, name_entities JSON, description_entities JSON);")
+                               "description TEXT, date DATETIME, name_entities JSON, description_entities JSON, "
+                               "type_event TEXT);")
             else:
-                for name, description, date, name_entities, description_entities in cursor.fetchall():
+                for name, description, date, name_entities, description_entities, type_event in cursor.fetchall():
                     a += 1
                     count_string_track += len(str(a)) + 2
                     name_entities = json.loads(name_entities)
@@ -121,12 +121,14 @@ async def in_moder_panel(bot, chat_id, message):
             await bot.send_message(chat_id, events, reply_markup=user_markup, entities=entity_list)
 
         elif message.text == 'Добавить новое событие':
-            key = InlineKeyboardMarkup()
-            key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню модпанели',
-                                         callback_data='Вернуться в главное меню модпанели'))
-            await bot.send_message(chat_id, 'Введите название события:', reply_markup=key)
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            user_markup.row('NFT mints', 'Token sales', 'Testnets')
+            user_markup.row('Whitelist / Registration deadline')
+            user_markup.row('Вернуться в главное меню')
+
+            await bot.send_message(chat_id, 'Выберите тип события', reply_markup=user_markup)
             with shelve.open(files.state_bd) as bd:
-                bd[str(chat_id)] = 2
+                bd[str(chat_id)] = 1
 
         elif message.text == 'Редактирование событий':
             con = sqlite3.connect(files.main_db)
@@ -210,6 +212,29 @@ async def in_moder_panel(bot, chat_id, message):
                             bd[str(chat_id)] = 11
                     con.close()
 
+        elif message.text == 'Изменить тип':
+            if get_state(chat_id) is True:
+                with shelve.open(files.state_bd) as bd:
+                    state_num = bd[str(chat_id)]
+                if state_num == 8:
+                    con = sqlite3.connect(files.main_db)
+                    cursor = con.cursor()
+                    a = 0
+                    cursor.execute("SELECT type_event FROM events WHERE name = " + "'" + edition_event.name + "';")
+                    for i in cursor.fetchall(): a += 1
+                    if a == 0:
+                        await bot.send_message(chat_id, 'События с таким типом нет!\nВыберите заново!')
+                    else:
+                        user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                        user_markup.row('NFT mints', 'Token sales', 'Testnets')
+                        user_markup.row('Whitelist / Registration deadline')
+                        user_markup.row('Вернуться в главное меню')
+                        await bot.send_message(chat_id, 'Выберите новый тип события',
+                                               parse_mode='Markdown', reply_markup=user_markup)
+                        with shelve.open(files.state_bd) as bd:
+                            bd[str(chat_id)] = 12
+                    con.close()
+
         elif message.text == 'Удалить событие':
             con = sqlite3.connect(files.main_db)
             cursor = con.cursor()
@@ -233,7 +258,32 @@ async def in_moder_panel(bot, chat_id, message):
             with shelve.open(files.state_bd) as bd:
                 state_num = bd[str(chat_id)]
 
-            if state_num == 2:
+            if state_num == 1:
+                if message.text == 'NFT mints' or message.text == 'Token sales' \
+                        or message.text == 'Whitelist / Registration deadline' or message.text == 'Testnets':
+                    creation_event.type_event = message.text
+
+                    user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                    user_markup.row('Вернуться в главное меню')
+                    await bot.send_message(chat_id, f'Тип события {creation_event.type_event}',
+                                           reply_markup=user_markup)
+
+                    key = InlineKeyboardMarkup()
+                    key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню модпанели',
+                                                 callback_data='Вернуться в главное меню модпанели'))
+                    await bot.send_message(chat_id, 'Введите название события:', reply_markup=key)
+                    with shelve.open(files.state_bd) as bd:
+                        bd[str(chat_id)] = 2
+                else:
+                    user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                    user_markup.row('NFT mints', 'Token sales', 'Testnets')
+                    user_markup.row('Whitelist / Registration deadline')
+                    user_markup.row('Вернуться в главное меню')
+
+                    await bot.send_message(chat_id, 'Выберите тип события из предложенного списка!',
+                                           reply_markup=user_markup)
+
+            elif state_num == 2:
                 creation_event.name = message.text
                 creation_event.name_entities = message
 
@@ -261,17 +311,21 @@ async def in_moder_panel(bot, chat_id, message):
                     con = sqlite3.connect(files.main_db)
                     cursor = con.cursor()
                     cursor.execute("INSERT INTO events (name, description, date, name_entities, " +
-                                   "description_entities) VALUES " + "('" + str(creation_event.name) + "', '" +
-                                   str(creation_event.description) + "', '" + str(creation_event.date) + "', '" +
-                                   str(creation_event.name_entities) + "', '" +
-                                   str(creation_event.description_entities) + "')")
+                                   "description_entities, type_event) VALUES " + "('" + str(creation_event.name) +
+                                   "', '" + str(creation_event.description) + "', '" +
+                                   str(creation_event.date) + "', '" + str(creation_event.name_entities) + "', '" +
+                                   str(creation_event.description_entities) + "', '" +
+                                   str(creation_event.type_event) + "')")
                     con.commit()
                     con.close()
-                    key = InlineKeyboardMarkup()
-                    key.add(InlineKeyboardButton(text='Вернуться в главное меню модпанели',
-                                                 callback_data='Вернуться в главное меню модпанели'))
-                    await bot.send_message(chat_id, 'Событие создано!', reply_markup=key)
+
+                    user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                    user_markup.row('Добавить новое событие', 'Удалить событие')
+                    user_markup.row('Редактирование событий')
+                    user_markup.row('Вернуться в главное меню')
+                    await bot.send_message(chat_id, 'Событие создано!', reply_markup=user_markup)
                     await log(f'Event {creation_event.name} is created by {chat_id}')
+                    await mailing(bot, creation_event)
                     with shelve.open(files.state_bd) as bd:
                         del bd[str(chat_id)]
                 else:
@@ -288,17 +342,21 @@ async def in_moder_panel(bot, chat_id, message):
                         con = sqlite3.connect(files.main_db)
                         cursor = con.cursor()
                         cursor.execute("INSERT INTO events (name, description, date, name_entities, " +
-                                       "description_entities) VALUES " + "('" + str(creation_event.name) + "', '" +
-                                       str(creation_event.description) + "', '" + str(creation_event.date) + "', '" +
-                                       str(creation_event.name_entities) + "', '" +
-                                       str(creation_event.description_entities) + "')")
+                                       "description_entities, type_event) VALUES " + "('" + str(creation_event.name) +
+                                       "', '" + str(creation_event.description) + "', '" +
+                                       str(creation_event.date) + "', '" + str(creation_event.name_entities) + "', '" +
+                                       str(creation_event.description_entities) + "', '" +
+                                       str(creation_event.type_event) + "')")
                         con.commit()
                         con.close()
-                        key = InlineKeyboardMarkup()
-                        key.add(InlineKeyboardButton(text='Вернуться в главное меню модпанели',
-                                                     callback_data='Вернуться в главное меню модпанели'))
-                        await bot.send_message(chat_id, 'Событие создано!', reply_markup=key)
+
+                        user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                        user_markup.row('Добавить новое событие', 'Удалить событие')
+                        user_markup.row('Редактирование событий')
+                        user_markup.row('Вернуться в главное меню')
+                        await bot.send_message(chat_id, 'Событие создано!', reply_markup=user_markup)
                         await log(f'Event {creation_event.name} is created by {chat_id}')
+                        await mailing(bot, creation_event)
                         with shelve.open(files.state_bd) as bd:
                             del bd[str(chat_id)]
 
@@ -338,7 +396,7 @@ async def in_moder_panel(bot, chat_id, message):
                     edition_event.name = message.text
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                     user_markup.row('Изменить название', 'Изменить описание')
-                    user_markup.row('Изменить дату')
+                    user_markup.row('Изменить дату', 'Изменить тип')
                     user_markup.row('Вернуться в главное меню')
                     await bot.send_message(chat_id, 'Теперь выберите, что хотите изменить', reply_markup=user_markup)
                     with shelve.open(files.state_bd) as bd:
@@ -355,7 +413,7 @@ async def in_moder_panel(bot, chat_id, message):
 
                 user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                 user_markup.row('Изменить название', 'Изменить описание')
-                user_markup.row('Изменить дату')
+                user_markup.row('Изменить дату', 'Изменить тип')
                 user_markup.row('Вернуться в главное меню')
                 await bot.send_message(chat_id, 'Название события успешно изменено!', reply_markup=user_markup)
                 await log(f'Name event {edition_event.name} is changed by {chat_id}')
@@ -373,7 +431,7 @@ async def in_moder_panel(bot, chat_id, message):
 
                 user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                 user_markup.row('Изменить название', 'Изменить описание')
-                user_markup.row('Изменить дату')
+                user_markup.row('Изменить дату', 'Изменить тип')
                 user_markup.row('Вернуться в главное меню')
                 await bot.send_message(chat_id, 'Описание события успешно изменено!', reply_markup=user_markup)
                 await log(f'Description event {edition_event.name} is changed by {chat_id}')
@@ -391,7 +449,7 @@ async def in_moder_panel(bot, chat_id, message):
 
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                     user_markup.row('Изменить название', 'Изменить описание')
-                    user_markup.row('Изменить дату')
+                    user_markup.row('Изменить дату', 'Изменить тип')
                     user_markup.row('Вернуться в главное меню')
                     await bot.send_message(chat_id, 'Дата события успешно изменена!', reply_markup=user_markup)
                     await log(f'Date event {edition_event.name} is changed by {chat_id}')
@@ -417,16 +475,33 @@ async def in_moder_panel(bot, chat_id, message):
 
                         user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                         user_markup.row('Изменить название', 'Изменить описание')
-                        user_markup.row('Изменить дату')
+                        user_markup.row('Изменить дату', 'Изменить тип')
                         user_markup.row('Вернуться в главное меню')
                         await bot.send_message(chat_id, 'Дата события успешно изменена!', reply_markup=user_markup)
                         await log(f'Date event {edition_event.name} is changed by {chat_id}')
                         with shelve.open(files.state_bd) as bd:
                             bd[str(chat_id)] = 8
 
+            elif state_num == 12:
+                con = sqlite3.connect(files.main_db)
+                cursor = con.cursor()
+                cursor.execute("UPDATE events SET type_event = '" + message.text + "' " +
+                               "WHERE name = '" + edition_event.name + "';")
+                con.commit()
+                con.close()
+
+                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                user_markup.row('Изменить название', 'Изменить описание')
+                user_markup.row('Изменить дату', 'Изменить тип')
+                user_markup.row('Вернуться в главное меню')
+                await bot.send_message(chat_id, 'Тип события успешно изменено!', reply_markup=user_markup)
+                await log(f'Type event {edition_event.name} is changed by {chat_id}')
+                with shelve.open(files.state_bd) as bd:
+                    bd[str(chat_id)] = 8
+
 
 async def moder_inline(bot, callback_data, chat_id, message_id):
-    if 'Вернуться в главное меню модпанели' == callback_data:
+    if callback_data == 'Вернуться в главное меню модпанели':
         if get_state(chat_id) is True:
             with shelve.open(files.state_bd) as bd: del bd[str(chat_id)]
         user_markup = ReplyKeyboardMarkup(resize_keyboard=True)

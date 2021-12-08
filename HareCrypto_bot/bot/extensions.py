@@ -15,18 +15,23 @@ class Token:
 
 
 class Event:
-    def __init__(self, name=None, description=None, date=None, name_entities=None, description_entities=None):
+    def __init__(self, name=None, description=None, date=None, name_entities=None,
+                 description_entities=None, type_event=None):
         self.name = name
         self.description = description
         self.date = date
         self.name_entities = name_entities
         self.description_entities = description_entities
+        self.type_event = type_event
 
 
+# класс для списков событий, внутри него происходит сбор и
+# дальнейшая сортировка событий по времени
 class Event_List:
     def __init__(self):
         self.events_unsorted = {}
         self.events_TBA = []
+        self.events_TT = []
         self.events_HOT = {}
         self.events_HOT_unsorted = {}
         self.events_PREVIOUS = {}
@@ -41,9 +46,14 @@ class Event_List:
                                   [self.events_UPCOMING_unsorted, self.events_UPCOMING]]
 
     def sort_out_all_groups(self):
-
         for events_types in self.events_types_pair:
             events_types[1] = dict(sorted(events_types[0].items(), key=lambda item: item[1]))
+
+
+class Page_Mem:
+    def __init__(self):
+        self.last_page = {}
+        self.list_pages = []
 
 
 class Message_Mem:
@@ -52,6 +62,7 @@ class Message_Mem:
         self.list_messages = []
 
 
+# проверка и удаление старых сообщений со списками событий
 async def check_repeated_message(bot, message, last_message):
     if message.chat.id in last_message.last_message.keys():
         last_message_start_id = last_message.last_message.get(message.chat.id)
