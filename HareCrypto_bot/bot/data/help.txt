@@ -1,0 +1,9 @@
+Я HareCrypto-бот!
+Можете использовать меня для слежения за событиями на крипторынке, такими как NFT минты, ICO, краудлоны, тестнеты и многое другое.
+По команде /event можно получить информацию о календаре событий.
+
+В этом канале https://t.me/harecrypt
+•Чат✍️: https://t.me/harecrypta_chat - чат гемов-людей
+•Канал✍️: https://t.me/HareCrypta_lab_ann - Лаборатория идей.
+•YouTube: https://www.youtube.com/c/HareCrypta
+•Instagram: https://instagram.com/harecrypta

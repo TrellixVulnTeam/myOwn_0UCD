@@ -1,8 +1,10 @@
 import datetime
 import sqlite3
+from collections import OrderedDict
 from datetime import datetime
 import shelve
 
+import yaml
 from aiogram.types import MessageEntity, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.json import json
 
@@ -115,6 +117,23 @@ def del_id(file, chat_id):
                 text += i + '\n'
     with open(file, 'w', encoding='utf-8') as f:
         f.write(text)
+
+
+def change_settings(settings):
+    new_settings = {
+        'Settings':
+            {
+                'HotEventNotification': settings.hot_event_setting,
+                'NewEventNotification': settings.new_event_setting
+            }
+                    }
+    with open(files.settings, 'w') as f:
+        yaml.dump(new_settings, f)
+
+
+def change_phrase(phrase, file):
+    with open(file, 'w', encoding='utf-8') as f:
+        f.write(str(phrase) + '\n')
 
 
 # рассылка уведомлений о создании нового события
@@ -271,13 +290,14 @@ async def hot_notification(bot, hot_event):
 
 # постраничный вывод списков событий
 async def page_output(message, last_page, page_num):
-    """ На первой странице - предыдущие события и ближайшие
-     На второй странице - категория NFT mints
-     На третьей странице - категория Token sales
-     На четвертой странице - категория Whitelist / Registration deadline
-     На пятой странице - категория Testnets
-     На пятой странице - категория Trend token (эта категория особенная:
-                                                не имеет даты, и пока не относится к предыдущим)
+    """
+    На первой странице - предыдущие события и ближайшие
+    На второй странице - категория NFT mints
+    На третьей странице - категория Token sales
+    На четвертой странице - категория Whitelist / Registration deadline
+    На пятой странице - категория Testnets
+    На пятой странице - категория Trend token (эта категория особенная:
+                                            не имеет даты, и пока не относится к предыдущим)
      """
 
     events_list = Event_List()
@@ -1055,8 +1075,17 @@ async def page_output(message, last_page, page_num):
         elif page_num == 6:
             count_string_track = 0
             num_event = 1
-            events += "Трендовые токены:\n"
-            count_string_track += len("Трендовые токены:\n") + 1
+
+            entity = MessageEntity(type='bold',
+                                   offset=count_string_track + 0,
+                                   length=len("💸Трендовые токены:\n"))
+            entity_list.append(entity)
+            entity = MessageEntity(type='underline',
+                                   offset=count_string_track + 0,
+                                   length=len("💸Трендовые токены:\n"))
+            entity_list.append(entity)
+            events += "💸Трендовые токены:\n"
+            count_string_track += len("💸Трендовые токены:\n") + 1
 
             for tt_events in events_list.events_TT:
                 name_entities = json.loads(tt_events[3])
@@ -1085,7 +1114,7 @@ async def page_output(message, last_page, page_num):
                                                    length=entity_values_list[2])
                             entity_list.append(entity)
 
-                count_string_track += len(tt_events[0]) + 3 + len(str(tt_events[2]))
+                count_string_track += len(tt_events[0]) + 3
 
                 if "entities" in description_entities:
 
@@ -1109,7 +1138,7 @@ async def page_output(message, last_page, page_num):
                                                    length=entity_values_list[2])
                             entity_list.append(entity)
 
-                count_string_track += 1
+                count_string_track += len(tt_events[1]) + 1
 
                 events += str(num_event) + '. ' + tt_events[0] + ' - ' + tt_events[1] + '\n'
                 num_event += 1

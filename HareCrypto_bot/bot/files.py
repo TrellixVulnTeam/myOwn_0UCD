@@ -1,5 +1,8 @@
 main_db = 'data/db/main_data.db'
 
+settings = 'settings.yaml'
+token = 'token.yaml'
+
 state_bd = 'data/bd/sost.bd'
 bot_message_bd = 'data/bd/bot_message_bd.bd'
 
@@ -11,3 +14,4 @@ users_list = 'data/lists/chatid_list.txt'
 chats_list = 'data/lists/chat_chatid_list.txt'
 blockusers_list = 'data/lists/blockusers_list.txt'
 
+help_text = 'data/help.txt'

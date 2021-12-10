@@ -15,7 +15,7 @@ from admin_panel import admin_panel, in_admin_panel, admin_inline, first_launch
 from config import admin_id
 # подключение функций из сторонних файлов
 from defs import get_admin_list, log, user_logger, get_moder_list, chat_logger, hot_notification, page_output
-from extensions import Token, Event_List, Message_Mem, check_repeated_message, Page_Mem
+from extensions import Settings, Event_List, Message_Mem, check_repeated_message, Page_Mem
 import files
 from mod_panel import moder_panel, in_moder_panel, moder_inline
 
@@ -32,7 +32,8 @@ last_page = Page_Mem()
 logging.basicConfig(level=logging.INFO)
 
 # настройка и инициализация бота
-with Token() as tg_token:
+settings = Settings()
+with Settings() as tg_token:
     bot = Bot(token=tg_token)
 dp = Dispatcher(bot)
 
@@ -76,15 +77,7 @@ async def process_start_command(message: types.Message):
 
     if message.chat.type == 'private':
         user_logger(message.chat.id)
-        await bot.send_message(message.chat.id, "Я HareCrypto-бот!\n"
-                                                "Можете использовать меня для слежения за событиями на крипторынке, "
-                                                "такие как NFT минты, ICO, краудлоны и многое другое. \n"
-                                                "По команде /event можно получить информацию о календаре событий.\n\n"
-                                                "В этом канале https://t.me/harecrypt\n"
-                                                "•Чат✍️:  https://t.me/harecrypta_chat - чат гемов-людей\n"
-                                                "•Канал✍️: https://t.me/HareCrypta_lab_ann - Лаборатория идей.\n"
-                                                "•YouTube: https://www.youtube.com/c/HareCrypta\n"
-                                                "•Inst: https://instagram.com/harecrypta - инста\n")
+        await bot.send_message(message.chat.id, settings.help_text)
     else:
         user_logger(message.from_user.id)
         try:
@@ -92,15 +85,7 @@ async def process_start_command(message: types.Message):
         except:
             chat_logger(message.chat.id, message.chat.title)
 
-        await bot.send_message(message.chat.id, "Я HareCrypto-бот!\n"
-                                                "Можете использовать меня для слежения за событиями на крипторынке, "
-                                                "такие как NFT минты, ICO, краудлоны и многое другое.\n"
-                                                "По команде /event можно получить информацию о календаре событий.\n\n"
-                                                "В этом канале https://t.me/harecrypt\n"
-                                                "•Чат✍️:  https://t.me/harecrypta_chat - чат гемов-людей\n"
-                                                "•Канал✍️: https://t.me/HareCrypta_lab_ann - Лаборатория идей.\n"
-                                                "•YouTube: https://www.youtube.com/c/HareCrypta\n"
-                                                "•Inst: https://instagram.com/harecrypta - инста\n")
+        await bot.send_message(message.chat.id, settings.help_text)
 
 
 # обработчик команды event
@@ -114,8 +99,14 @@ async def event_handler(message: types.Message):
     await bot.send_message(message.chat.id, events, entities=entity_list, reply_markup=inline_paginator)
 
     if message.chat.type == 'private':
+        user_logger(message.chat.id)
         await log(f'User {message.chat.id} requested events list')
     else:
+        try:
+            chat_logger(message.chat.id, message.chat.title, message.chat.username)
+        except:
+            chat_logger(message.chat.id, message.chat.title)
+
         await log(f'Member {message.from_user.id} from the group {message.chat.id} requested events list')
 
 
@@ -125,14 +116,14 @@ async def event_handler(message: types.Message):
 async def admin_handler(message: types.Message):
     if message.chat.type == 'private':
         user_logger(message.chat.id)
-        if message.chat.id == admin_id and await first_launch(bot, message.chat.id) is True:
+        if message.chat.id == admin_id and await first_launch(bot, settings, message.chat.id) is True:
             await bot.send_message(message.chat.id, "Теперь вы Админ!")
             await log(f'User {message.chat.id} successfully requested admin panel')
         elif (message.chat.id == admin_id or message.chat.id in get_admin_list()) and \
-                await first_launch(bot, message.chat.id) is False:
+                await first_launch(bot, settings, message.chat.id) is False:
             await bot.send_message(message.chat.id, "Привет, Админ!")
             await log(f'User {message.chat.id} successfully requested admin panel')
-            await admin_panel(bot, message.chat.id)
+            await admin_panel(bot, message.chat.id, settings)
         else:
             await bot.send_message(message.chat.id, "Вы не Админ!")
             await log(f'User {message.chat.id} unsuccessfully requested admin panel')
@@ -156,7 +147,7 @@ async def moder_handler(message: types.Message):
         if message.chat.id in get_moder_list():
             await bot.send_message(message.chat.id, "Привет, Модератор!")
             await log(f'User {message.chat.id} successfully requested moderator panel')
-            await moder_panel(bot, message.chat.id)
+            await moder_panel(bot, message.chat.id, settings)
         else:
             await bot.send_message(message.chat.id, "Вы не Модератор!")
             await log(f'User {message.chat.id} unsuccessfully requested moderator panel')
@@ -177,9 +168,9 @@ async def moder_handler(message: types.Message):
 async def actions_handler(message: types.Message):
     if message.chat.type == 'private':
         if message.chat.id == admin_id or message.chat.id in get_admin_list():
-            await in_admin_panel(bot, message.chat.id, message)
+            await in_admin_panel(bot, message.chat.id, settings, message)
         elif message.chat.id in get_moder_list():
-            await in_moder_panel(bot, message.chat.id, message)
+            await in_moder_panel(bot, message.chat.id, settings, message)
     else:
         pass
 
@@ -389,7 +380,8 @@ async def check_hot_events():
 # расписание задач
 async def scheduler():
     aioschedule.every().day.at("00:00").do(check_old_events)
-    aioschedule.every(1).minutes.do(check_hot_events)
+    if settings.hot_event_setting:
+        aioschedule.every(1).minutes.do(check_hot_events)
 
     while True:
         await aioschedule.run_pending()

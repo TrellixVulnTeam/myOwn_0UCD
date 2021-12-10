@@ -1,19 +1,30 @@
-# класс по работе с токеном
-class Token:
+import files
+import yaml
+
+
+# класс по настройке бота
+class Settings:
     def __init__(self):
-        pass
+        self.file_settings = open(files.settings, 'r')  # открываем файл для чтения
+        self.settings = yaml.safe_load(self.file_settings)
+        self.new_event_setting = self.settings['Settings']['NewEventNotification']
+        self.hot_event_setting = self.settings['Settings']['HotEventNotification']
+        self.file_settings.close()
+
+        self.file_help_text = open('data/help.txt', encoding='utf-8')
+        self.help_text = self.file_help_text.read()
+        self.file_help_text.close()
 
     def __enter__(self):  # обработчик входа в контекстный менеджер
-        self.file = open('token.yaml', 'r')  # открываем файл для чтения
-        self.name_t = self.file.read(8)  # читаем первые символы с названием конфигурации
-        if self.name_t == "TOKEN = ":  # находим конфигурацию токена
-            self.TOKEN = self.file.read()  # считываем токен
-            return self.TOKEN
+        self.file_token = open(files.token, 'r')  # открываем файл для чтения
+        self.TOKEN = yaml.safe_load(self.file_token)
+        return self.TOKEN['TOKEN']
 
     def __exit__(self, exc_type, exc_val, exc_tb):  # обработчик выхода из контекстного менеджера
-        self.file.close()
+        self.file_token.close()
 
 
+# класс события (используется при создании события и редактирования, как хранилище данных до записи в базу)
 class Event:
     def __init__(self, name=None, description=None, date=None, name_entities=None,
                  description_entities=None, type_event=None):
