@@ -1,1 +1,2 @@
-(-1001171564130, Тестовая группа, t.me/test_group987)
+(-1001171564130; Тестовая группа; t.me/test_group987)
+(-1001611958259; IDO, Tokensale, NFT; t.me/tokenswyat)

@@ -7,9 +7,7 @@ from aiogram.utils.json import json
 import files
 from defs import get_moder_list, get_state, log, mailing
 from extensions import Event
-from aiogram.types import ReplyKeyboardRemove, \
-    ReplyKeyboardMarkup, KeyboardButton, \
-    InlineKeyboardMarkup, InlineKeyboardButton, MessageEntity
+from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, MessageEntity
 
 creation_event = Event()
 edition_event = Event()
@@ -19,13 +17,41 @@ async def moder_panel(bot, chat_id, settings):
     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
     user_markup.row('События')
 
-    await bot.send_message(chat_id, """ Добро пожаловать в панель модератора.
-    """, parse_mode='MarkDown', reply_markup=user_markup)
+    await bot.send_message(chat_id, """ Добро пожаловать в панель модератора.""",
+                           parse_mode='MarkDown', reply_markup=user_markup)
 
     await log(f'Launch moder panel of bot by moder {chat_id}')
 
 
 async def in_moder_panel(bot, chat_id, settings, message):
+    """
+        Функция состоит из двух частей: в первой части обработка текстовых команда,
+        во второй - обработка состояний переписки.
+
+        При добавлении события учитываются состояния 1, 2, 3, 4:
+        1 - выбор категории события,
+        2 - ввод названия,
+        3 - ввод описания,
+        4 - ввод даты в формате
+
+        При удалении события - состояние 6:
+        6 - выбор события для удаления из существующих
+
+        При редактировании события - состояния 7, 8, 9, 10, 11, 12:
+        7 - выбор события для редактирования из существующих,
+        8 - состояние изменения события,
+        9 - изменение названия события,
+        10 - изменение описания события,
+        11 - изменение даты события в формате,
+        11 - изменение типа события из предложенных категорий
+
+
+        :param bot: Bot from aiogram
+        :param chat_id: int
+        :param settings: object class: Settings from hare_bot.py
+        :param message: types.Message from aiogram
+        :return: None
+        """
     if chat_id in get_moder_list():
         if message.text == 'Вернуться в главное меню' or message.text == '/mod':
             if get_state(chat_id) is True:

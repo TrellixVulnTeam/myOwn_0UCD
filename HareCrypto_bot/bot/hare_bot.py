@@ -1,3 +1,7 @@
+# IDEA: сделать бота инлайн, но нужно знать, какие данные выводить инлайн
+# IDEA: добавить в настройку изменение количества дней, после истечения которых удаляются события
+# IDEA: добавить в настройку изменение количества минут для уведомления о надвигающемся событии
+
 import asyncio
 import logging
 import sqlite3
@@ -7,19 +11,18 @@ import aioschedule  # библиотека для выставления зад�
 # подключаем библиотеку для работы с API телеграм бота
 from aiogram import Bot, Dispatcher, types, executor
 from aiogram.types import ReplyKeyboardRemove, \
-    ReplyKeyboardMarkup, KeyboardButton, \
-    InlineKeyboardMarkup, InlineKeyboardButton, MessageEntity
+    InlineKeyboardMarkup, InlineKeyboardButton
 
 # подключение функций из сторонних файлов
 from admin_panel import admin_panel, in_admin_panel, admin_inline, first_launch
 from config import admin_id
-# подключение функций из сторонних файлов
 from defs import get_admin_list, log, user_logger, get_moder_list, chat_logger, hot_notification, page_output
 from extensions import Settings, Event_List, Message_Mem, check_repeated_message, Page_Mem
 import files
 from mod_panel import moder_panel, in_moder_panel, moder_inline
 
-dateFormatter = "%d.%m.%Y %H:%M"
+# формат даты
+date_formatter = "%d.%m.%Y %H:%M"
 
 # объекты классов для работы с сообщениями по командам start, help, event
 last_message_start = Message_Mem()
@@ -28,7 +31,7 @@ last_message_event = Message_Mem()
 # объект класса для работы с постраничным выводом
 last_page = Page_Mem()
 
-# log
+# set logging level
 logging.basicConfig(level=logging.INFO)
 
 # настройка и инициализация бота
@@ -72,7 +75,7 @@ async def process_start_command(message: types.Message):
 
 # обработчик команды help
 @dp.message_handler(commands=['help'])
-async def process_start_command(message: types.Message):
+async def process_help_command(message: types.Message):
     await check_repeated_message(bot, message, last_message_help)
 
     if message.chat.type == 'private':
@@ -162,8 +165,8 @@ async def moder_handler(message: types.Message):
 
 
 # обработчик входных данных из сообщений
-# вход в админ панель
-# вход в мод панель
+# обработка команд для админ панели
+# обработка команд для мод панели
 @dp.message_handler(content_types=["text"])
 async def actions_handler(message: types.Message):
     if message.chat.type == 'private':
@@ -175,7 +178,7 @@ async def actions_handler(message: types.Message):
         pass
 
 
-# обработчик инлайн событий DELETE
+# обработчик инлайн событий (функция пустышка!!!)
 @dp.inline_handler(lambda query: len(query.query) > 0)
 async def query_text(query):
     kb = types.InlineKeyboardMarkup()
@@ -193,6 +196,11 @@ async def query_text(query):
 # обработчик коллбэков от инлайн кнопок
 @dp.callback_query_handler(lambda c: True)
 async def callback(callback_query: types.CallbackQuery):
+    """
+    Для приватных сообщений обрабатывается коллбэк для админов и модераторов
+    и также для перелистывания страниц (forward, backward).
+    Для сообщений в группе идёт обработка команд только для перелистывания страниц (forward, backward).
+    """
     if callback_query.message:
         if callback_query.message.chat.type == 'private':
             if callback_query.message.chat.id in get_admin_list():
@@ -341,7 +349,7 @@ async def check_old_events():
 
             if events_value == 'TBA':
                 continue
-            if events_value < -336:
+            if events_value < -336:  # число указано в часах (14 дней есть 336 часов)
                 cursor.execute("DELETE FROM events WHERE name = " + "'" + str(name) + "';")
                 con.commit()
 
@@ -350,49 +358,74 @@ async def check_old_events():
 
 # проверка приближающихся событий (каждую минуту проверяется, остается ли 59 минут до события)
 async def check_hot_events():
-    con = sqlite3.connect(files.main_db)
-    cursor = con.cursor()
+    if settings.hot_event_setting:
+        con = sqlite3.connect(files.main_db)
+        cursor = con.cursor()
 
-    try:
-        cursor.execute("SELECT name, description, date, name_entities, description_entities, "
-                       "type_event FROM events;")
-    except:
-        cursor.execute("CREATE TABLE events (id INT, name TEXT, "
-                       "description TEXT, date DATETIME, name_entities JSON, description_entities JSON, "
-                       "type_event TEXT);")
-    else:
-        now = datetime.now()
+        try:
+            cursor.execute("SELECT name, description, date, name_entities, description_entities, "
+                           "type_event FROM events;")
+        except:
+            cursor.execute("CREATE TABLE events (id INT, name TEXT, "
+                           "description TEXT, date DATETIME, name_entities JSON, description_entities JSON, "
+                           "type_event TEXT);")
+        else:
+            now = datetime.now()
 
-        for name, description, date, name_entities, description_entities, type_event in cursor.fetchall():
-            if date == 'TBA':
-                continue
-            else:
-                date_formatted = datetime.strptime(date, "%d.%m.%Y %H:%M")
-                delta = date_formatted - now
-                delta = divmod(delta.total_seconds(), 60)
-                event = (name, description, date, name_entities, description_entities, type_event)
-                if delta[0] == 59:
-                    await hot_notification(bot, event)
+            for name, description, date, name_entities, description_entities, type_event in cursor.fetchall():
+                if date == 'TBA':
+                    continue
+                else:
+                    date_formatted = datetime.strptime(date, "%d.%m.%Y %H:%M")
+                    delta = date_formatted - now
+                    delta = divmod(delta.total_seconds(), 60)
+                    event = (name, description, date, name_entities, description_entities, type_event)
 
-        con.close()
+                    if delta[0] == 59:  # число указано в минутах
+                        await hot_notification(bot, event)
+
+            con.close()
 
 
 # расписание задач
 async def scheduler():
+    """
+    Регистратор задач для:
+        -очистки старых событий и удаление их
+        -проверка наличия событий, которым остаётся меньше часа до начала
+    """
     aioschedule.every().day.at("00:00").do(check_old_events)
-    if settings.hot_event_setting:
-        aioschedule.every(1).minutes.do(check_hot_events)
+    aioschedule.every(1).minutes.do(check_hot_events)
 
     while True:
         await aioschedule.run_pending()
-        await asyncio.sleep(10)
+        await asyncio.sleep(1)
 
 
 # функция при запуске боте
 async def on_startup(_):
     asyncio.create_task(scheduler())
 
+    get_list = 0
+    for user in user_logger(get_list):
+        try:
+            await bot.send_message(int(user), "Я снова в строю!")
+            await log(f"User {int(user)} got 'Startup' message")
+        except:
+            await log(f"User {int(user)} didn't get 'Startup' message")
+
+
+# функция при запуске боте
+async def on_shutdown(_):
+    get_list = 0
+    for user in user_logger(get_list):
+        try:
+            await bot.send_message(int(user), "Ушел на обновление. Скоро буду!")
+            await log(f"User {int(user)} got 'Shutdown' message")
+        except:
+            await log(f"User {int(user)} didn't get 'Shutdown' message")
+
 
 # входная точка программы
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=False, on_startup=on_startup)
+    executor.start_polling(dp, skip_updates=False, on_startup=on_startup, on_shutdown=on_shutdown)

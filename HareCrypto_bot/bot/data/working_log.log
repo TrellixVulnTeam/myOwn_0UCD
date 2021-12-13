@@ -15,3 +15,84 @@
 2021-12-10 15:00:05.173144    | User 526995113 requested events list
 2021-12-10 15:00:57.742073    | Event trend link is created by 526995113
 2021-12-10 15:01:04.464593    | User 526995113 requested events list
+2021-12-11 14:52:37.702139    | User 526545459 requested events list
+2021-12-11 14:53:15.317053    | Event trend link is deleted by 526995113
+2021-12-11 14:53:17.974744    | Event test is deleted by 526995113
+2021-12-11 14:53:20.497254    | Event token is deleted by 526995113
+2021-12-11 14:54:12.734076    | Event NFT is created by 526995113
+2021-12-11 14:54:12.922952    | User 526545459 got 'New event' message
+2021-12-11 14:54:13.257815    | User 526995113 got 'New event' message
+2021-12-11 14:54:13.473551    | Chat -1001171564130 got 'New event' message
+2021-12-11 14:56:43.422274    | User 526545459 didn't get 'Hot event' message
+2021-12-11 14:56:43.575923    | User 526995113 didn't get 'Hot event' message
+2021-12-11 14:56:43.718360    | Chat -1001171564130 didn't get 'Hot event' message
+2021-12-11 14:56:54.064939    | Event NFT is deleted by 526995113
+2021-12-11 14:57:32.500377    | Event NFT is created by 526995113
+2021-12-11 14:57:32.686981    | User 526545459 got 'New event' message
+2021-12-11 14:57:32.841102    | User 526995113 got 'New event' message
+2021-12-11 14:57:33.034305    | Chat -1001171564130 got 'New event' message
+2021-12-11 14:59:44.226112    | User 526545459 didn't get 'Hot event' message
+2021-12-11 14:59:44.349975    | User 526995113 didn't get 'Hot event' message
+2021-12-11 14:59:44.474644    | Chat -1001171564130 didn't get 'Hot event' message
+2021-12-11 15:00:44.979604    | Event NFT is deleted by 526995113
+2021-12-11 15:01:25.379946    | Event NFT is created by 526995113
+2021-12-11 15:01:25.581339    | User 526545459 got 'New event' message
+2021-12-11 15:01:25.757336    | User 526995113 got 'New event' message
+2021-12-11 15:01:25.950990    | Chat -1001171564130 got 'New event' message
+2021-12-11 15:03:31.818258    | User 526545459 didn't get 'Hot event' message
+2021-12-11 15:03:31.940908    | User 526995113 didn't get 'Hot event' message
+2021-12-11 15:03:32.064167    | Chat -1001171564130 didn't get 'Hot event' message
+2021-12-11 15:06:06.137414    | Date event NFT is changed by 526995113
+2021-12-11 15:10:32.498132    | User 526545459 didn't get 'Hot event' message
+2021-12-11 15:10:32.622833    | User 526995113 didn't get 'Hot event' message
+2021-12-11 15:10:32.744443    | Chat -1001171564130 didn't get 'Hot event' message
+2021-12-11 15:11:27.177883    | Date event NFT is changed by 526995113
+2021-12-11 15:13:11.986306    | User 526545459 didn't get 'Hot event' message
+2021-12-11 15:13:12.115972    | User 526995113 didn't get 'Hot event' message
+2021-12-11 15:13:12.244233    | Chat -1001171564130 didn't get 'Hot event' message
+2021-12-11 15:15:11.814757    | Date event NFT is changed by 526995113
+2021-12-11 15:17:50.777358    | User 526545459 got 'Hot event' message
+2021-12-11 15:17:50.964685    | User 526995113 got 'Hot event' message
+2021-12-11 15:17:51.127991    | Chat -1001171564130 got 'Hot event' message
+2021-12-11 15:19:40.023645    | Date event NFT is changed by 526995113
+2021-12-11 15:21:09.887128    | User 526545459 got 'Hot event' message
+2021-12-11 15:21:10.131988    | User 526995113 got 'Hot event' message
+2021-12-11 15:21:10.309263    | Chat -1001171564130 got 'Hot event' message
+2021-12-11 15:41:31.340841    | Date event NFT is changed by 526995113
+2021-12-11 15:43:42.180150    | User 526545459 got 'Hot event' message
+2021-12-11 15:43:42.355090    | User 526995113 got 'Hot event' message
+2021-12-11 15:43:42.570958    | Chat -1001171564130 got 'Hot event' message
+2021-12-11 15:44:47.741636    | Date event NFT is changed by 526995113
+2021-12-11 15:46:25.677296    | User 526545459 got 'Hot event' message
+2021-12-11 15:46:25.855870    | User 526995113 got 'Hot event' message
+2021-12-11 15:46:26.057905    | Chat -1001171564130 got 'Hot event' message
+2021-12-11 15:49:23.694295    | Date event NFT is changed by 526995113
+2021-12-11 15:52:00.366065    | User 526545459 got 'Hot event' message
+2021-12-11 15:52:00.568410    | User 526995113 got 'Hot event' message
+2021-12-11 15:52:00.763094    | Chat -1001171564130 got 'Hot event' message
+2021-12-11 15:52:57.088966    | Event NFT is deleted by 526995113
+2021-12-11 15:53:41.114934    | Event TEST link is created by 526995113
+2021-12-11 15:53:41.353090    | User 526545459 got 'New event' message
+2021-12-11 15:53:41.593558    | User 526995113 got 'New event' message
+2021-12-11 15:53:41.782394    | Chat -1001171564130 got 'New event' message
+2021-12-11 15:55:53.739058    | User 526545459 got 'Hot event' message
+2021-12-11 15:55:53.927738    | User 526995113 got 'Hot event' message
+2021-12-11 15:55:54.089119    | Chat -1001171564130 got 'Hot event' message
+2021-12-11 15:59:21.995198    | Date event TEST link is changed by 526995113
+2021-12-11 16:01:59.650304    | User 526545459 got 'Hot event' message
+2021-12-11 16:01:59.863006    | User 526995113 got 'Hot event' message
+2021-12-11 16:02:00.082820    | Chat -1001171564130 got 'Hot event' message
+2021-12-13 17:16:41.042169    | User 526545459 got 'Shutdown' message
+2021-12-13 17:16:41.224688    | User 526995113 got 'Shutdown' message
+2021-12-13 17:17:26.745004    | User 526545459 got 'Startup' message
+2021-12-13 17:17:26.908895    | User 526995113 got 'Startup' message
+2021-12-13 18:21:13.741874    | User 526545459 got 'Shutdown' message
+2021-12-13 18:21:14.030112    | User 526995113 got 'Shutdown' message
+2021-12-13 19:14:59.561768    | User 526545459 got 'Startup' message
+2021-12-13 19:14:59.752817    | User 526995113 got 'Startup' message
+2021-12-13 19:17:31.723737    | User 526545459 got 'Shutdown' message
+2021-12-13 19:17:31.919313    | User 526995113 got 'Shutdown' message
+2021-12-13 19:18:29.784264    | User 526545459 got 'Startup' message
+2021-12-13 19:18:30.087297    | User 526995113 got 'Startup' message
+2021-12-13 19:19:20.503943    | User 526545459 got 'Shutdown' message
+2021-12-13 19:19:20.675927    | User 526995113 got 'Shutdown' message

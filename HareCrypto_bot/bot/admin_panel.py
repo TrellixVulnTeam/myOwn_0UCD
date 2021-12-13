@@ -1,16 +1,15 @@
+# IDEA: сделать также изменение фразы для команды /start
+
 import datetime
 from datetime import datetime
 import sqlite3
 import shelve
-from extensions import Settings
 
 from aiogram.utils.json import json
 
 import files
 from extensions import Event
-from aiogram.types import ReplyKeyboardRemove, \
-    ReplyKeyboardMarkup, KeyboardButton, \
-    InlineKeyboardMarkup, InlineKeyboardButton, MessageEntity
+from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, MessageEntity
 
 import config
 from defs import get_admin_list, log, user_logger, new_admin, get_state, del_id, get_moder_list, new_moder, mailing, \
@@ -48,6 +47,45 @@ async def admin_panel(bot, chat_id, settings, first__launch=False):
 
 
 async def in_admin_panel(bot, chat_id, settings, message):
+    """
+    Функция состоит из двух частей: в первой части обработка текстовых команда,
+    во второй - обработка состояний переписки.
+
+    При добавлении события учитываются состояния 1, 2, 3, 4:
+    1 - выбор категории события,
+    2 - ввод названия,
+    3 - ввод описания,
+    4 - ввод даты в формате
+
+    При удалении события - состояние 6:
+    6 - выбор события для удаления из существующих
+
+    При редактировании события - состояния 7, 8, 9, 10, 11, 12:
+    7 - выбор события для редактирования из существующих,
+    8 - состояние изменения события,
+    9 - изменение названия события,
+    10 - изменение описания события,
+    11 - изменение даты события в формате,
+    11 - изменение типа события из предложенных категорий
+
+    При работе со списком админов - состояния 21, 22:
+    21 - добавление нового админа, где нужно ввести его id
+    22 - удаление админа из списка
+
+    При работе со списком модераторов - состояния 31, 32:
+    31 - добавление нового модератора (может сделать только один из админов)
+    32 - удаление модератора из списка (может сделать только один из админов)
+
+    При настройке бота - состояние 41:
+    41 - изменений выводной фразы по команде /help
+
+
+    :param bot: Bot from aiogram
+    :param chat_id: int
+    :param settings: object class: Settings from hare_bot.py
+    :param message: types.Message from aiogram
+    :return: None
+    """
     if chat_id in get_admin_list():
         if message.text == 'Вернуться в главное меню' or message.text == '/adm':
             if get_state(chat_id) is True:
@@ -369,7 +407,7 @@ async def in_admin_panel(bot, chat_id, settings, message):
                 a += 1
                 chat = chat.replace('(', '')
                 chat = chat.replace(')', '')
-                chat = chat.split(', ')
+                chat = chat.split('; ')
                 chats += f"{a}.{chat[0]} - {str(chat[1])} - {str(chat[2])}"
             user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
             user_markup.row('Вернуться в главное меню')

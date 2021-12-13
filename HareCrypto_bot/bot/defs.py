@@ -1,10 +1,9 @@
 import datetime
 import sqlite3
-from collections import OrderedDict
 from datetime import datetime
 import shelve
-
 import yaml
+
 from aiogram.types import MessageEntity, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.json import json
 
@@ -12,6 +11,7 @@ import files
 from extensions import Event_List
 
 
+# запись в файл логирования
 async def log(text):
     time = str(datetime.now())
     try:
@@ -55,6 +55,8 @@ def get_state(chat_id):
         if str(chat_id) in bd: return True
 
 
+# запись в список пользователей
+# если 0 в качестве входного аргумента, выводит список пользователей
 def user_logger(chat_id):
     if chat_id == 0:
         users_list = []
@@ -69,6 +71,8 @@ def user_logger(chat_id):
                     with open(files.users_list, 'a', encoding='utf-8') as f: f.write(str(chat_id) + '\n')
 
 
+# запись в список групп
+# если 0 в качестве входного аргумента, выводит список групп
 def chat_logger(chat_id, chat_title=None, chat_name=None):
     if chat_id == 0:
         chats_list = []
@@ -83,15 +87,15 @@ def chat_logger(chat_id, chat_title=None, chat_name=None):
                     if chat_name is not None:
                         with open(files.chats_list, 'a', encoding='utf-8') as f:
                             f.write("(" + str(chat_id) +
-                                    ", " + str(chat_title) +
-                                    ", t.me/" +
+                                    "; " + str(chat_title) +
+                                    "; t.me/" +
                                     str(chat_name) + ")\n")
                     else:
                         with open(files.chats_list, 'a', encoding='utf-8') as f:
                             f.write("(" + str(chat_id) +
-                                    ", " + str(chat_title) +
-                                    ", " +
-                                    str(chat_name) + ")\n")
+                                    "; " + str(chat_title) +
+                                    "; " +
+                                    "Closed group" + ")\n")
 
 
 def new_blocked_user(his_id):
@@ -119,6 +123,7 @@ def del_id(file, chat_id):
         f.write(text)
 
 
+# изменение настроек бота и запись в файл настроек
 def change_settings(settings):
     new_settings = {
         'Settings':
@@ -131,6 +136,7 @@ def change_settings(settings):
         yaml.dump(new_settings, f)
 
 
+# изменение фразы и сохранение её в файл
 def change_phrase(phrase, file):
     with open(file, 'w', encoding='utf-8') as f:
         f.write(str(phrase) + '\n')
@@ -202,7 +208,7 @@ async def mailing(bot, creation_event):
     for chat in chat_logger(get_list):
         chat = chat.replace('(', '')
         chat = chat.replace(')', '')
-        chat = chat.split(', ')
+        chat = chat.split('; ')
         try:
             await bot.send_message(int(chat[0]), f"Было добавлено новое событие!\n\n"
                                                  f"{str(creation_event.name)} - {str(creation_event.date)} МСК - "
@@ -212,13 +218,13 @@ async def mailing(bot, creation_event):
             await log(f"Chat {int(chat[0])} didn't get 'New event' message")
 
 
-# рассылка уведомления о скором приближении события (когда остаётся меньше часа)
+# рассылка уведомления о скором приближении события
 async def hot_notification(bot, hot_event):
     get_list = 0
     entity_list = []
     name_entities = json.loads(hot_event[3])
     description_entities = json.loads(hot_event[4])
-    count_string_track = len("Осталось меньше часа до события:\n\n") + 1
+    count_string_track = len("Осталось меньше часа до события:\n\n") + 1 + len('🔥 ')
 
     if "entities" in name_entities:
 
@@ -242,7 +248,7 @@ async def hot_notification(bot, hot_event):
                                        length=entity_values_list[2])
                 entity_list.append(entity)
 
-    count_string_track += len('🔥 ') + len(str(hot_event[0])) + 3 + len(str(hot_event[2])) + 7
+    count_string_track += len(str(hot_event[0])) + len(' - ') + len(str(hot_event[2])) + len(' МСК - ')
 
     if "entities" in description_entities:
 
@@ -278,7 +284,7 @@ async def hot_notification(bot, hot_event):
     for chat in chat_logger(get_list):
         chat = chat.replace('(', '')
         chat = chat.replace(')', '')
-        chat = chat.split(', ')
+        chat = chat.split('; ')
         try:
             await bot.send_message(int(chat[0]), f"Осталось меньше часа до события:\n\n"
                                                  f"🔥 {str(hot_event[0])} - {str(hot_event[2])} МСК - "
@@ -291,14 +297,21 @@ async def hot_notification(bot, hot_event):
 # постраничный вывод списков событий
 async def page_output(message, last_page, page_num):
     """
-    На первой странице - предыдущие события и ближайшие
-    На второй странице - категория NFT mints
-    На третьей странице - категория Token sales
-    На четвертой странице - категория Whitelist / Registration deadline
-    На пятой странице - категория Testnets
-    На пятой странице - категория Trend token (эта категория особенная:
-                                            не имеет даты, и пока не относится к предыдущим)
-     """
+    На первой странице - предыдущие события и ближайшие,
+    На второй странице - категория NFT mints,
+    На третьей странице - категория Token sales,
+    На четвертой странице - категория Whitelist / Registration deadline,
+    На пятой странице - категория Testnets,
+    На шестой странице - категория Trend token (эта категория особенная:
+                                            не имеет даты, и пока не относится к предыдущим).
+
+    :param message: types.Message from aiogram
+    :param last_page: int
+    :param page_num: int
+    :return: events: List
+    :return: entity_list: List[types.MessageEntity from aiogram]
+    :return: inline_paginator: types.InlineKeyboardMarkup(types.InlineKeyboardButton) from aiogram
+    """
 
     events_list = Event_List()
     last_page.last_page[message.message_id] = page_num
