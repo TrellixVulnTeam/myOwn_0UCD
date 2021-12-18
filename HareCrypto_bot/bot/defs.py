@@ -1,8 +1,7 @@
-import datetime
 import sqlite3
-from datetime import datetime
 import shelve
 import yaml
+import pendulum
 
 from aiogram.types import MessageEntity, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.json import json
@@ -13,7 +12,7 @@ from extensions import Event_List
 
 # запись в файл логирования
 async def log(text):
-    time = str(datetime.now())
+    time = str(pendulum.now())
     try:
         with open(files.working_log, 'a', encoding='utf-8') as f:
             f.write(time + '    | ' + text + '\n')
@@ -205,6 +204,16 @@ async def mailing(bot, creation_event):
         except:
             await log(f"User {int(user)} didn't get 'New event' message")
 
+            new_user_list = ''
+            with open(files.users_list, "r", encoding='utf-8', ) as f:
+                for user_id in f.readlines():
+                    if str(user) in user_id:
+                        continue
+                    else:
+                        new_user_list += user_id
+            with open(files.users_list, "w", encoding='utf-8', ) as f:
+                f.write(new_user_list)
+
     for chat in chat_logger(get_list):
         chat = chat.replace('(', '')
         chat = chat.replace(')', '')
@@ -216,6 +225,16 @@ async def mailing(bot, creation_event):
             await log(f"Chat {int(chat[0])} got 'New event' message")
         except:
             await log(f"Chat {int(chat[0])} didn't get 'New event' message")
+
+            new_chat_str = ''
+            with open(files.chats_list, "r", encoding='utf-8', ) as f:
+                for chat_id in f.readlines():
+                    if chat[0] in chat_id:
+                        continue
+                    else:
+                        new_chat_str += chat_id
+            with open(files.chats_list, "w", encoding='utf-8', ) as f:
+                f.write(new_chat_str)
 
 
 # рассылка уведомления о скором приближении события
@@ -281,6 +300,16 @@ async def hot_notification(bot, hot_event):
         except:
             await log(f"User {int(user)} didn't get 'Hot event' message")
 
+            new_user_list = ''
+            with open(files.users_list, "r", encoding='utf-8', ) as f:
+                for user_id in f.readlines():
+                    if str(user) in user_id:
+                        continue
+                    else:
+                        new_user_list += user_id
+            with open(files.users_list, "w", encoding='utf-8', ) as f:
+                f.write(new_user_list)
+
     for chat in chat_logger(get_list):
         chat = chat.replace('(', '')
         chat = chat.replace(')', '')
@@ -293,9 +322,19 @@ async def hot_notification(bot, hot_event):
         except:
             await log(f"Chat {int(chat[0])} didn't get 'Hot event' message")
 
+            new_chat_list = ''
+            with open(files.chats_list, "r", encoding='utf-8',) as f:
+                for chat_id in f.readlines():
+                    if chat[0] in chat_id:
+                        continue
+                    else:
+                        new_chat_list += chat_id
+            with open(files.chats_list, "w", encoding='utf-8',) as f:
+                f.write(new_chat_list)
+
 
 # постраничный вывод списков событий
-async def page_output(message, last_page, page_num):
+async def page_output(message, last_page, page_num, time_zone):
     """
     На первой странице - предыдущие события и ближайшие,
     На второй странице - категория NFT mints,
@@ -305,6 +344,7 @@ async def page_output(message, last_page, page_num):
     На шестой странице - категория Trend token (эта категория особенная:
                                             не имеет даты, и пока не относится к предыдущим).
 
+    :param time_zone:
     :param message: types.Message from aiogram
     :param last_page: int
     :param page_num: int
@@ -330,7 +370,7 @@ async def page_output(message, last_page, page_num):
                        "description TEXT, date DATETIME, name_entities JSON, description_entities JSON, "
                        "type_event TEXT);")
     else:
-        now = datetime.now()
+        now = pendulum.now(time_zone)
 
         for name, description, date, name_entities, description_entities, type_event in cursor.fetchall():
             a += 1
@@ -343,7 +383,7 @@ async def page_output(message, last_page, page_num):
                 events_list.events_unsorted.update({(name, description, date, name_entities,
                                                      description_entities, type_event): 'TBA'})
             else:
-                date_formatted = datetime.strptime(date, "%d.%m.%Y %H:%M")
+                date_formatted = pendulum.from_format(date, "DD.MM.YYYY HH:mm", tz=time_zone)
                 delta = date_formatted - now
                 delta = divmod(delta.total_seconds(), 3600)
                 events_list.events_unsorted.update({(name, description, date, name_entities,

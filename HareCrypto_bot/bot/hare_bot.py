@@ -5,10 +5,10 @@
 import asyncio
 import logging
 import sqlite3
-from datetime import datetime
 import aioschedule  # библиотека для выставления заданий по расписанию
 
 # подключаем библиотеку для работы с API телеграм бота
+import pendulum
 from aiogram import Bot, Dispatcher, types, executor
 from aiogram.types import ReplyKeyboardRemove, \
     InlineKeyboardMarkup, InlineKeyboardButton
@@ -97,7 +97,7 @@ async def process_help_command(message: types.Message):
 async def event_handler(message: types.Message):
     await check_repeated_message(bot, message, last_message_event)
 
-    events, entity_list, inline_paginator = await page_output(message, last_page, 1)
+    events, entity_list, inline_paginator = await page_output(message, last_page, 1, settings.time_zone)
 
     await bot.send_message(message.chat.id, events, entities=entity_list, reply_markup=inline_paginator)
 
@@ -218,7 +218,7 @@ async def callback(callback_query: types.CallbackQuery):
                     page_num = last_page.last_page[callback_query.message.message_id-1]
 
                     events, entity_list, inline_paginator = \
-                        await page_output(callback_query.message, last_page, page_num)
+                        await page_output(callback_query.message, last_page, page_num, settings.time_zone)
 
                     await bot.edit_message_text(chat_id=callback_query.message.chat.id,
                                                 message_id=callback_query.message.message_id,
@@ -228,7 +228,7 @@ async def callback(callback_query: types.CallbackQuery):
                     page_num = last_page.last_page[callback_query.message.message_id - 1]
 
                     events, entity_list, inline_paginator = \
-                        await page_output(callback_query.message, last_page, page_num)
+                        await page_output(callback_query.message, last_page, page_num, settings.time_zone)
 
                     await bot.edit_message_text(chat_id=callback_query.message.chat.id,
                                                 message_id=callback_query.message.message_id,
@@ -242,7 +242,7 @@ async def callback(callback_query: types.CallbackQuery):
                     page_num = last_page.last_page[callback_query.message.message_id - 1]
 
                     events, entity_list, inline_paginator = \
-                        await page_output(callback_query.message, last_page, page_num)
+                        await page_output(callback_query.message, last_page, page_num, settings.time_zone)
 
                     await bot.edit_message_text(chat_id=callback_query.message.chat.id,
                                                 message_id=callback_query.message.message_id,
@@ -252,7 +252,7 @@ async def callback(callback_query: types.CallbackQuery):
                     page_num = last_page.last_page[callback_query.message.message_id - 1]
 
                     events, entity_list, inline_paginator = \
-                        await page_output(callback_query.message, last_page, page_num)
+                        await page_output(callback_query.message, last_page, page_num, settings.time_zone)
 
                     await bot.edit_message_text(chat_id=callback_query.message.chat.id,
                                                 message_id=callback_query.message.message_id,
@@ -269,7 +269,7 @@ async def callback(callback_query: types.CallbackQuery):
                     page_num = last_page.last_page[callback_query.message.message_id - 1]
 
                     events, entity_list, inline_paginator = \
-                        await page_output(callback_query.message, last_page, page_num)
+                        await page_output(callback_query.message, last_page, page_num, settings.time_zone)
 
                     await bot.edit_message_text(chat_id=callback_query.message.chat.id,
                                                 message_id=callback_query.message.message_id,
@@ -279,7 +279,7 @@ async def callback(callback_query: types.CallbackQuery):
                     page_num = last_page.last_page[callback_query.message.message_id - 1]
 
                     events, entity_list, inline_paginator = \
-                        await page_output(callback_query.message, last_page, page_num)
+                        await page_output(callback_query.message, last_page, page_num, settings.time_zone)
 
                     await bot.edit_message_text(chat_id=callback_query.message.chat.id,
                                                 message_id=callback_query.message.message_id,
@@ -293,7 +293,7 @@ async def callback(callback_query: types.CallbackQuery):
                     page_num = last_page.last_page[callback_query.message.message_id - 1]
 
                     events, entity_list, inline_paginator = \
-                        await page_output(callback_query.message, last_page, page_num)
+                        await page_output(callback_query.message, last_page, page_num, settings.time_zone)
 
                     await bot.edit_message_text(chat_id=callback_query.message.chat.id,
                                                 message_id=callback_query.message.message_id,
@@ -303,7 +303,7 @@ async def callback(callback_query: types.CallbackQuery):
                     page_num = last_page.last_page[callback_query.message.message_id - 1]
 
                     events, entity_list, inline_paginator = \
-                        await page_output(callback_query.message, last_page, page_num)
+                        await page_output(callback_query.message, last_page, page_num, settings.time_zone)
 
                     await bot.edit_message_text(chat_id=callback_query.message.chat.id,
                                                 message_id=callback_query.message.message_id,
@@ -331,14 +331,14 @@ async def check_old_events():
                        "description TEXT, date DATETIME, name_entities JSON, description_entities JSON, "
                        "type_event TEXT);")
     else:
-        now = datetime.now()
+        now = pendulum.now(settings.time_zone)
 
         for name, description, date, name_entities, description_entities, type_event in cursor.fetchall():
             if date == 'TBA':
                 events_list.events_unsorted.update({(name, description, date, name_entities,
                                                      description_entities, type_event): 'TBA'})
             else:
-                date_formatted = datetime.strptime(date, "%d.%m.%Y %H:%M")
+                date_formatted = pendulum.from_format(date, "DD.MM.YYYY HH:mm", tz=settings.time_zone)
                 delta = date_formatted - now
                 delta = divmod(delta.total_seconds(), 3600)
                 events_list.events_unsorted.update({(name, description, date, name_entities,
@@ -349,7 +349,7 @@ async def check_old_events():
 
             if events_value == 'TBA':
                 continue
-            if events_value < -336:  # число указано в часах (14 дней есть 336 часов)
+            if events_value < -72:  # число указано в часах (3 дня есть 72 часа)
                 cursor.execute("DELETE FROM events WHERE name = " + "'" + str(name) + "';")
                 con.commit()
 
@@ -370,13 +370,13 @@ async def check_hot_events():
                            "description TEXT, date DATETIME, name_entities JSON, description_entities JSON, "
                            "type_event TEXT);")
         else:
-            now = datetime.now()
+            now = pendulum.now(settings.time_zone)
 
             for name, description, date, name_entities, description_entities, type_event in cursor.fetchall():
                 if date == 'TBA':
                     continue
                 else:
-                    date_formatted = datetime.strptime(date, "%d.%m.%Y %H:%M")
+                    date_formatted = pendulum.from_format(date, "DD.MM.YYYY HH:mm", tz=settings.time_zone)
                     delta = date_formatted - now
                     delta = divmod(delta.total_seconds(), 60)
                     event = (name, description, date, name_entities, description_entities, type_event)
@@ -394,7 +394,7 @@ async def scheduler():
         -очистки старых событий и удаление их
         -проверка наличия событий, которым остаётся меньше часа до начала
     """
-    aioschedule.every().day.at("00:00").do(check_old_events)
+    aioschedule.every().hour.do(check_old_events)
     aioschedule.every(1).minutes.do(check_hot_events)
 
     while True:
@@ -407,23 +407,23 @@ async def on_startup(_):
     asyncio.create_task(scheduler())
 
     get_list = 0
-    for user in user_logger(get_list):
-        try:
-            await bot.send_message(int(user), "Я снова в строю!")
-            await log(f"User {int(user)} got 'Startup' message")
-        except:
-            await log(f"User {int(user)} didn't get 'Startup' message")
+    # for user in user_logger(get_list):
+    #     try:
+    #         await bot.send_message(int(user), "Я снова в строю!")
+    #         await log(f"User {int(user)} got 'Startup' message")
+    #     except:
+    #         await log(f"User {int(user)} didn't get 'Startup' message")
 
 
 # функция при запуске боте
 async def on_shutdown(_):
     get_list = 0
-    for user in user_logger(get_list):
-        try:
-            await bot.send_message(int(user), "Ушел на обновление. Скоро буду!")
-            await log(f"User {int(user)} got 'Shutdown' message")
-        except:
-            await log(f"User {int(user)} didn't get 'Shutdown' message")
+    # for user in user_logger(get_list):
+    #     try:
+    #         await bot.send_message(int(user), "Ушел на обновление. Скоро буду!")
+    #         await log(f"User {int(user)} got 'Shutdown' message")
+    #     except:
+    #         await log(f"User {int(user)} didn't get 'Shutdown' message")
 
 
 # входная точка программы

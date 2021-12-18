@@ -9,6 +9,7 @@ class Settings:
         self.settings = yaml.safe_load(self.file_settings)
         self.new_event_setting = self.settings['Settings']['NewEventNotification']
         self.hot_event_setting = self.settings['Settings']['HotEventNotification']
+        self.time_zone = str(self.settings['Settings']['TimeZone'])
         self.file_settings.close()
 
         self.file_help_text = open('data/help.txt', encoding='utf-8')

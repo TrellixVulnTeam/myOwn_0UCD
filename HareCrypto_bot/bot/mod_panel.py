@@ -138,12 +138,19 @@ async def in_moder_panel(bot, chat_id, settings, message):
 
                     events += str(a) + '. ' + str(name) + ' - ' + str(date) + ' МСК - ' + str(description) + '\n'
 
+                    if a % 10 == 0:
+                        await bot.send_message(chat_id, events, reply_markup=user_markup, entities=entity_list)
+                        entity_list = []
+                        count_string_track = 19
+                        events = 'Созданые события:\n\n'
+
                 con.close()
 
             if a == 0:
                 events = "События не созданы!"
             else:
                 pass
+
             await bot.send_message(chat_id, events, reply_markup=user_markup, entities=entity_list)
 
         elif message.text == 'Добавить новое событие':

@@ -1,10 +1,9 @@
 # IDEA: сделать также изменение фразы для команды /start
 
-import datetime
-from datetime import datetime
 import sqlite3
 import shelve
 
+import pendulum
 from aiogram.utils.json import json
 
 import files
@@ -175,12 +174,19 @@ async def in_admin_panel(bot, chat_id, settings, message):
                     events += str(a) + '. ' + str(name) + ' - ' + str(date) + ' МСК - ' + str(description) + \
                               ' - ' + str(type_event) + '\n'
 
+                    if a % 10 == 0:
+                        await bot.send_message(chat_id, events, reply_markup=user_markup, entities=entity_list)
+                        entity_list = []
+                        count_string_track = 19
+                        events = 'Созданые события:\n\n'
+
                 con.close()
 
             if a == 0:
                 events = "События не созданы!"
             else:
                 pass
+
             await bot.send_message(chat_id, events, reply_markup=user_markup, entities=entity_list)
 
         elif message.text == 'Добавить новое событие':
@@ -392,15 +398,24 @@ async def in_admin_panel(bot, chat_id, settings, message):
                     bd[str(chat_id)] = 32
 
         elif message.text == 'Список пользователей':
-            get_list = 0
-            users = "Список пользователей:\n\n"
-            for user in user_logger(get_list):
-                users += f"<a href='tg://user?id={user}'>{user}</a>\n"
             user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
             user_markup.row('Вернуться в главное меню')
+            get_list = 0
+            a = 0
+            users = "Список пользователей:\n\n"
+            for user in user_logger(get_list):
+                a += 1
+                users += f"{a}.<a href='tg://user?id={user}'>{user}</a>\n"
+
+                if a % 50 == 0:
+                    await bot.send_message(chat_id, users, reply_markup=user_markup, parse_mode="HTML")
+                    users = "Список пользователей:\n\n"
+
             await bot.send_message(chat_id, users, reply_markup=user_markup, parse_mode="HTML")
 
         elif message.text == 'Список групп':
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            user_markup.row('Вернуться в главное меню')
             a = 0
             chats = "Список групп:\n\n"
             for chat in chat_logger(0):
@@ -409,8 +424,11 @@ async def in_admin_panel(bot, chat_id, settings, message):
                 chat = chat.replace(')', '')
                 chat = chat.split('; ')
                 chats += f"{a}.{chat[0]} - {str(chat[1])} - {str(chat[2])}"
-            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
-            user_markup.row('Вернуться в главное меню')
+
+                if a % 50 == 0:
+                    await bot.send_message(chat_id, chats, reply_markup=user_markup, parse_mode="HTML")
+                    chats = "Список групп:\n\n"
+
             await bot.send_message(chat_id, chats, reply_markup=user_markup, parse_mode="HTML")
 
         elif message.text == 'Скачать лог файл':
@@ -617,7 +635,7 @@ async def in_admin_panel(bot, chat_id, settings, message):
                         del bd[str(chat_id)]
                 else:
                     try:
-                        datetime.strptime(message.text, "%d.%m.%Y %H:%M")
+                        pendulum.from_format(message.text, "DD.MM.YYYY HH:mm", tz=settings.time_zone)
                     except:
                         await bot.send_message(chat_id, 'Вы ввели дату в неправильном формате!')
                         key = InlineKeyboardMarkup()
@@ -745,7 +763,7 @@ async def in_admin_panel(bot, chat_id, settings, message):
                         bd[str(chat_id)] = 8
                 else:
                     try:
-                        datetime.strptime(message.text, "%d.%m.%Y %H:%M")
+                        pendulum.from_format(message.text, "DD.MM.YYYY HH:mm", tz=settings.time_zone)
                     except:
                         await bot.send_message(chat_id, 'Вы ввели дату в неправильном формате!')
                         key = InlineKeyboardMarkup()
