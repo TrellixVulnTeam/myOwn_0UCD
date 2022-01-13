@@ -1,4 +1,4 @@
-# IDEA: сделать бота инлайн, но нужно знать, какие данные выводить инлайн
+# IDEA: сделать бота инлайн, но нужно знать, какие данные выводить
 # IDEA: добавить в настройку изменение количества дней, после истечения которых удаляются события
 # IDEA: добавить в настройку изменение количества минут для уведомления о надвигающемся событии
 
@@ -21,9 +21,6 @@ from extensions import Settings, Event_List, Message_Mem, check_repeated_message
 import files
 from mod_panel import moder_panel, in_moder_panel, moder_inline
 
-# формат даты
-date_formatter = "%d.%m.%Y %H:%M"
-
 # объекты классов для работы с сообщениями по командам start, help, event
 last_message_start = Message_Mem()
 last_message_help = Message_Mem()
@@ -45,7 +42,7 @@ dp = Dispatcher(bot)
 @dp.message_handler(commands=['start'])
 async def process_start_command(message: types.Message):
     if message.chat.type == 'private':
-        user_logger(message.chat.id)
+        user_logger(message.chat.id, message.chat.username)
         await bot.send_message(message.chat.id, f"Привет, {message.chat.username}!\n",
                                reply_markup=ReplyKeyboardRemove())
         add_bot_ingroup = InlineKeyboardMarkup()
@@ -59,7 +56,7 @@ async def process_start_command(message: types.Message):
     else:
         await check_repeated_message(bot, message, last_message_start)
 
-        user_logger(message.from_user.id)
+        user_logger(message.from_user.id, message.from_user.username)
         try:
             chat_logger(message.chat.id, message.chat.title, message.chat.username)
         except:
@@ -79,10 +76,10 @@ async def process_help_command(message: types.Message):
     await check_repeated_message(bot, message, last_message_help)
 
     if message.chat.type == 'private':
-        user_logger(message.chat.id)
+        user_logger(message.chat.id, message.chat.username)
         await bot.send_message(message.chat.id, settings.help_text)
     else:
-        user_logger(message.from_user.id)
+        user_logger(message.from_user.id, message.from_user.username)
         try:
             chat_logger(message.chat.id, message.chat.title, message.chat.username)
         except:
@@ -102,9 +99,10 @@ async def event_handler(message: types.Message):
     await bot.send_message(message.chat.id, events, entities=entity_list, reply_markup=inline_paginator)
 
     if message.chat.type == 'private':
-        user_logger(message.chat.id)
+        user_logger(message.chat.id, message.chat.username)
         await log(f'User {message.chat.id} requested events list')
     else:
+        user_logger(message.from_user.id, message.from_user.username)
         try:
             chat_logger(message.chat.id, message.chat.title, message.chat.username)
         except:
@@ -118,20 +116,21 @@ async def event_handler(message: types.Message):
 @dp.message_handler(commands=["adm"])
 async def admin_handler(message: types.Message):
     if message.chat.type == 'private':
-        user_logger(message.chat.id)
-        if message.chat.id == admin_id and await first_launch(bot, settings, message.chat.id) is True:
+        user_logger(message.chat.id, message.chat.username)
+        if message.chat.id == admin_id and await first_launch(bot, message.chat.id) is True:
             await bot.send_message(message.chat.id, "Теперь вы Админ!")
             await log(f'User {message.chat.id} successfully requested admin panel')
-        elif (message.chat.id == admin_id or message.chat.id in get_admin_list()) and \
-                await first_launch(bot, settings, message.chat.id) is False:
+        elif (message.chat.id == admin_id or
+              message.chat.id in [message.chat.id for item in get_admin_list() if message.chat.id in item]) and \
+                await first_launch(bot, message.chat.id) is False:
             await bot.send_message(message.chat.id, "Привет, Админ!")
             await log(f'User {message.chat.id} successfully requested admin panel')
-            await admin_panel(bot, message.chat.id, settings)
+            await admin_panel(bot, message, settings)
         else:
             await bot.send_message(message.chat.id, "Вы не Админ!")
             await log(f'User {message.chat.id} unsuccessfully requested admin panel')
     else:
-        user_logger(message.from_user.id)
+        user_logger(message.from_user.id, message.from_user.username)
         try:
             chat_logger(message.chat.id, message.chat.title, message.chat.username)
         except:
@@ -146,16 +145,16 @@ async def admin_handler(message: types.Message):
 @dp.message_handler(commands=["mod"])
 async def moder_handler(message: types.Message):
     if message.chat.type == 'private':
-        user_logger(message.chat.id)
-        if message.chat.id in get_moder_list():
+        user_logger(message.chat.id, message.chat.username)
+        if message.chat.id in [message.chat.id for item in get_admin_list() if message.chat.id in item]:
             await bot.send_message(message.chat.id, "Привет, Модератор!")
             await log(f'User {message.chat.id} successfully requested moderator panel')
-            await moder_panel(bot, message.chat.id, settings)
+            await moder_panel(bot, message)
         else:
             await bot.send_message(message.chat.id, "Вы не Модератор!")
             await log(f'User {message.chat.id} unsuccessfully requested moderator panel')
     else:
-        user_logger(message.from_user.id)
+        user_logger(message.from_user.id, message.from_user.username)
         try:
             chat_logger(message.chat.id, message.chat.title, message.chat.username)
         except:
@@ -170,10 +169,11 @@ async def moder_handler(message: types.Message):
 @dp.message_handler(content_types=["text"])
 async def actions_handler(message: types.Message):
     if message.chat.type == 'private':
-        if message.chat.id == admin_id or message.chat.id in get_admin_list():
-            await in_admin_panel(bot, message.chat.id, settings, message)
-        elif message.chat.id in get_moder_list():
-            await in_moder_panel(bot, message.chat.id, settings, message)
+        if message.chat.id == admin_id or \
+                message.chat.id in [message.chat.id for item in get_admin_list() if message.chat.id in item]:
+            await in_admin_panel(bot, settings, message)
+        elif message.chat.id in [message.chat.id for item in get_moder_list() if message.chat.id in item]:
+            await in_moder_panel(bot, settings, message)
     else:
         pass
 
@@ -203,10 +203,14 @@ async def callback(callback_query: types.CallbackQuery):
     """
     if callback_query.message:
         if callback_query.message.chat.type == 'private':
-            if callback_query.message.chat.id in get_admin_list():
+            if callback_query.message.chat.id in [callback_query.message.chat.id
+                                                  for item in get_admin_list()
+                                                  if callback_query.message.chat.id in item]:
                 await admin_inline(bot, callback_query.data, callback_query.message.chat.id,
                                    callback_query.message.message_id)
-            elif callback_query.message.chat.id in get_moder_list():
+            elif callback_query.message.chat.id in [callback_query.message.chat.id
+                                                    for item in get_moder_list()
+                                                    if callback_query.message.chat.id in item]:
                 await moder_inline(bot, callback_query.data, callback_query.message.chat.id,
                                    callback_query.message.message_id)
 
@@ -215,7 +219,7 @@ async def callback(callback_query: types.CallbackQuery):
 
                 if callback_query.message.message_id - 1 in last_page.last_page.keys() and page_num != 7:
                     last_page.last_page[callback_query.message.message_id - 1] += 1
-                    page_num = last_page.last_page[callback_query.message.message_id-1]
+                    page_num = last_page.last_page[callback_query.message.message_id - 1]
 
                     events, entity_list, inline_paginator = \
                         await page_output(callback_query.message, last_page, page_num, settings.time_zone)
@@ -223,7 +227,7 @@ async def callback(callback_query: types.CallbackQuery):
                     await bot.edit_message_text(chat_id=callback_query.message.chat.id,
                                                 message_id=callback_query.message.message_id,
                                                 text=events, entities=entity_list, reply_markup=inline_paginator)
-                elif callback_query.message.message_id-1 in last_page.last_page.keys() and page_num == 7:
+                elif callback_query.message.message_id - 1 in last_page.last_page.keys() and page_num == 7:
                     last_page.last_page[callback_query.message.message_id - 1] = 1
                     page_num = last_page.last_page[callback_query.message.message_id - 1]
 
@@ -235,7 +239,7 @@ async def callback(callback_query: types.CallbackQuery):
                                                 text=events, entities=entity_list, reply_markup=inline_paginator)
 
             if callback_query.data == "backward":
-                page_num = last_page.last_page[callback_query.message.message_id-1] - 1
+                page_num = last_page.last_page[callback_query.message.message_id - 1] - 1
 
                 if callback_query.message.message_id - 1 in last_page.last_page.keys() and page_num != 0:
                     last_page.last_page[callback_query.message.message_id - 1] -= 1
@@ -407,23 +411,23 @@ async def on_startup(_):
     asyncio.create_task(scheduler())
 
     get_list = 0
-    # for user in user_logger(get_list):
-    #     try:
-    #         await bot.send_message(int(user), "Я снова в строю!")
-    #         await log(f"User {int(user)} got 'Startup' message")
-    #     except:
-    #         await log(f"User {int(user)} didn't get 'Startup' message")
+    for user in user_logger(get_list):
+        try:
+            await bot.send_message(user[0], "Я снова в строю!")
+            await log(f"User {user[0]} got 'Startup' message")
+        except:
+            await log(f"User {user[0]} didn't get 'Startup' message")
 
 
 # функция при запуске боте
 async def on_shutdown(_):
     get_list = 0
-    # for user in user_logger(get_list):
-    #     try:
-    #         await bot.send_message(int(user), "Ушел на обновление. Скоро буду!")
-    #         await log(f"User {int(user)} got 'Shutdown' message")
-    #     except:
-    #         await log(f"User {int(user)} didn't get 'Shutdown' message")
+    for user in user_logger(get_list):
+        try:
+            await bot.send_message(user[0], "Ушел на обновление. Скоро буду!")
+            await log(f"User {user[0]} got 'Shutdown' message")
+        except:
+            await log(f"User {user[0]} didn't get 'Shutdown' message")
 
 
 # входная точка программы

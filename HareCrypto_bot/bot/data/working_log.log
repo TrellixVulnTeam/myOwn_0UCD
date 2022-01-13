@@ -331,3 +331,126 @@
 2021-12-18T15:31:24.464698+03:00    | User 156679675 didn't get 'Hot event' message
 2021-12-18T15:31:24.770879+03:00    | User 1141724848 didn't get 'Hot event' message
 2021-12-18T15:31:25.088210+03:00    | Chat -1001171564130 got 'Hot event' message
+2021-12-18T17:28:50.466844+03:00    | User 526545459 got 'Startup' message
+2021-12-18T17:28:50.637227+03:00    | User 526995113 got 'Startup' message
+2021-12-18T17:28:50.827090+03:00    | User 508039404 got 'Startup' message
+2021-12-18T17:28:52.528827+03:00    | User 526545459 got 'Shutdown' message
+2021-12-18T17:28:52.692076+03:00    | User 526995113 got 'Shutdown' message
+2021-12-18T17:28:52.864135+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T18:48:37.739264+03:00    | User 526545459 got 'Startup' message
+2021-12-20T18:48:37.983737+03:00    | User 526995113 got 'Startup' message
+2021-12-20T18:48:38.239512+03:00    | User 508039404 got 'Startup' message
+2021-12-20T18:49:05.097792+03:00    | User 526545459 got 'Shutdown' message
+2021-12-20T18:49:05.355747+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T18:49:05.579081+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T18:53:57.639498+03:00    | User 526545459 got 'Startup' message
+2021-12-20T18:53:57.864386+03:00    | User 526995113 got 'Startup' message
+2021-12-20T18:53:58.047357+03:00    | User 508039404 got 'Startup' message
+2021-12-20T18:54:02.508831+03:00    | User 526995113 requested events list
+2021-12-20T18:54:21.109735+03:00    | User 526545459 got 'Shutdown' message
+2021-12-20T18:54:21.376293+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T18:54:21.581402+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T19:14:00.551918+03:00    | User 526545459 got 'Startup' message
+2021-12-20T19:14:00.842566+03:00    | User 526995113 got 'Startup' message
+2021-12-20T19:14:01.076343+03:00    | User 508039404 got 'Startup' message
+2021-12-20T19:14:25.210362+03:00    | User 526545459 got 'Shutdown' message
+2021-12-20T19:14:25.418540+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T19:14:25.716509+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T19:16:36.338650+03:00    | User 526545459 got 'Startup' message
+2021-12-20T19:16:36.596273+03:00    | User 526995113 got 'Startup' message
+2021-12-20T19:16:36.778201+03:00    | User 508039404 got 'Startup' message
+2021-12-20T19:16:58.313541+03:00    | User 526545459 got 'Shutdown' message
+2021-12-20T19:16:58.588148+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T19:16:58.766012+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T19:17:53.189643+03:00    | User 526545459 got 'Startup' message
+2021-12-20T19:17:53.364330+03:00    | User 526995113 got 'Startup' message
+2021-12-20T19:17:53.532895+03:00    | User 508039404 got 'Startup' message
+2021-12-20T19:18:09.878762+03:00    | User 526545459 got 'Shutdown' message
+2021-12-20T19:18:10.102999+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T19:18:10.259452+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T19:37:04.545273+03:00    | User 526545459 got 'Startup' message
+2021-12-20T19:37:04.846562+03:00    | User 526995113 got 'Startup' message
+2021-12-20T19:37:05.062653+03:00    | User 508039404 got 'Startup' message
+2021-12-20T19:38:08.629731+03:00    | User 526545459 got 'Shutdown' message
+2021-12-20T19:38:08.822847+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T19:38:09.030959+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T19:38:11.488461+03:00    | User 526545459 got 'Startup' message
+2021-12-20T19:38:11.713250+03:00    | User 526995113 got 'Startup' message
+2021-12-20T19:38:12.001045+03:00    | User 508039404 got 'Startup' message
+2021-12-20T19:38:42.102565+03:00    | Date event TEST link is changed by 526995113
+2021-12-20T19:39:09.152624+03:00    | Event TEST is created by 526995113
+2021-12-20T19:39:09.365518+03:00    | User 526545459 got 'New event' message
+2021-12-20T19:39:09.580276+03:00    | User 526995113 got 'New event' message
+2021-12-20T19:39:09.745215+03:00    | User 508039404 got 'New event' message
+2021-12-20T19:39:10.111463+03:00    | Chat -1001171564130 got 'New event' message
+2021-12-20T19:39:10.301157+03:00    | Chat -1001188884130 didn't get 'New event' message
+2021-12-20T19:39:50.181133+03:00    | Event TEST is deleted by 526995113
+2021-12-20T19:39:53.144228+03:00    | Event TEST link is deleted by 526995113
+2021-12-20T19:40:06.299078+03:00    | Event TEST is created by 526995113
+2021-12-20T19:40:06.556195+03:00    | User 526545459 got 'New event' message
+2021-12-20T19:40:06.815545+03:00    | User 526995113 got 'New event' message
+2021-12-20T19:40:07.048720+03:00    | User 508039404 got 'New event' message
+2021-12-20T19:40:07.256927+03:00    | Chat -1001171564130 got 'New event' message
+2021-12-20T19:40:07.496715+03:00    | Chat -1001188884130 didn't get 'New event' message
+2021-12-20T19:46:11.567835+03:00    | User 526545459 got 'Shutdown' message
+2021-12-20T19:46:11.812952+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T19:46:12.028703+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T19:46:20.159607+03:00    | User 526545459 got 'Startup' message
+2021-12-20T19:46:20.367104+03:00    | User 526995113 got 'Startup' message
+2021-12-20T19:46:20.579536+03:00    | User 508039404 got 'Startup' message
+2021-12-20T19:46:45.977113+03:00    | Event TEST is deleted by 526995113
+2021-12-20T19:46:57.156524+03:00    | Event TEST is created by 526995113
+2021-12-20T19:46:57.395812+03:00    | User 526545459 got 'New event' message
+2021-12-20T19:46:57.553339+03:00    | User 526995113 got 'New event' message
+2021-12-20T19:46:57.721113+03:00    | User 508039404 got 'New event' message
+2021-12-20T19:46:57.894677+03:00    | Chat -1001171564130 got 'New event' message
+2021-12-20T19:46:58.029484+03:00    | Chat -1001188884130 didn't get 'New event' message
+2021-12-20T19:47:50.262519+03:00    | User 526545459 got 'Shutdown' message
+2021-12-20T19:47:50.467633+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T19:47:50.672849+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T20:00:28.704632+03:00    | User 526545459 got 'Startup' message
+2021-12-20T20:00:28.975548+03:00    | User 526995113 got 'Startup' message
+2021-12-20T20:00:29.192859+03:00    | User 508039404 got 'Startup' message
+2021-12-20T20:04:03.793264+03:00    | User 526545459 got 'Shutdown' message
+2021-12-20T20:04:04.030802+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T20:04:04.201244+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T20:04:06.821347+03:00    | User 526545459 got 'Startup' message
+2021-12-20T20:04:07.026956+03:00    | User 526995113 got 'Startup' message
+2021-12-20T20:04:07.251702+03:00    | User 508039404 got 'Startup' message
+2021-12-20T21:28:00.523987+03:00    | User 526545459 got 'Shutdown' message
+2021-12-20T21:28:00.701408+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T21:28:00.877806+03:00    | User 508039404 got 'Shutdown' message
+2021-12-20T21:34:14.060100+03:00    | User 526995113 got 'Startup' message
+2021-12-20T21:34:55.936278+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T21:35:12.211587+03:00    | User 526995113 got 'Startup' message
+2021-12-20T21:36:18.426457+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T22:44:59.708675+03:00    | User 526995113 got 'Startup' message
+2021-12-20T22:47:23.502932+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T22:47:26.066489+03:00    | User 526995113 got 'Startup' message
+2021-12-20T22:47:45.783793+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T22:48:37.298283+03:00    | User 526995113 got 'Startup' message
+2021-12-20T22:50:31.310583+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T22:50:33.820687+03:00    | User 526995113 got 'Startup' message
+2021-12-20T22:51:16.201284+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T22:59:14.722562+03:00    | User 526995113 got 'Startup' message
+2021-12-20T23:02:18.365291+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T23:06:26.685547+03:00    | User 526995113 got 'Startup' message
+2021-12-20T23:06:49.206810+03:00    | Event TEST is deleted by 526995113
+2021-12-20T23:16:24.383961+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T23:16:27.080571+03:00    | User 526995113 got 'Startup' message
+2021-12-20T23:17:52.820170+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T23:23:26.636477+03:00    | User 526995113 got 'Startup' message
+2021-12-20T23:24:21.948498+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T23:26:14.237102+03:00    | User 526995113 got 'Startup' message
+2021-12-20T23:26:42.053202+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T23:26:45.281741+03:00    | User 526995113 got 'Startup' message
+2021-12-20T23:27:50.326662+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T23:29:37.114421+03:00    | User 526995113 got 'Startup' message
+2021-12-20T23:30:09.077932+03:00    | New admin Dmitry_Rusak is added by 526995113
+2021-12-20T23:30:37.981680+03:00    | New moder звони is added by 526995113
+2021-12-20T23:33:32.997522+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T23:33:35.548988+03:00    | User 526995113 got 'Startup' message
+2021-12-20T23:35:25.986982+03:00    | User 526995113 got 'Shutdown' message
+2021-12-20T23:35:29.402115+03:00    | User 526995113 got 'Startup' message
+2021-12-20T23:35:37.709702+03:00    | The admin 526545459 - Dmitry_Rusak is removed by 526995113
+2021-12-20T23:36:02.128902+03:00    | User 526995113 got 'Shutdown' message

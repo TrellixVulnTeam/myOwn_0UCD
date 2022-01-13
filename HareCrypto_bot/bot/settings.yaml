@@ -1,4 +1,4 @@
 Settings:
-  HotEventNotification: true
+  HotEventNotification: false
   NewEventNotification: true
   TimeZone: Europe/Moscow

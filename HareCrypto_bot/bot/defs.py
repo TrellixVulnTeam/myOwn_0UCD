@@ -23,30 +23,66 @@ async def log(text):
 
 def get_admin_list():
     admins_list = []
-    with open(files.admins_list, encoding='utf-8') as f:
-        for admin_id in f.readlines():
-            admins_list.append(int(admin_id))
+    a = 0
+
+    con = sqlite3.connect(files.main_db)
+    cursor = con.cursor()
+    try:
+        cursor.execute("SELECT id, username FROM admins;")
+    except:
+        cursor.execute("CREATE TABLE admins (id INT, username TEXT);")
+
+    for id_a, name in cursor.fetchall():
+        a += 1
+        admin = (id_a, name)
+        admins_list.append(admin)
+
     return admins_list
 
 
 def get_moder_list():
     moders_list = []
-    with open(files.moders_list, encoding='utf-8') as f:
-        for moder_id in f.readlines():
-            moders_list.append(int(moder_id))
+    a = 0
+
+    con = sqlite3.connect(files.main_db)
+    cursor = con.cursor()
+    try:
+        cursor.execute("SELECT id, username FROM moders;")
+    except:
+        cursor.execute("CREATE TABLE moders (id INT, username TEXT);")
+
+    for id_m, name in cursor.fetchall():
+        a += 1
+        moder = (id_m, name)
+        moders_list.append(moder)
+
     return moders_list
 
 
-def new_admin(his_id):
-    with open(files.admins_list, encoding='utf-8') as f:
-        if not str(his_id) in f.read():
-            with open(files.admins_list, 'a', encoding='utf-8') as f: f.write(str(his_id) + '\n')
+def new_admin(his_id, his_username):
+    con = sqlite3.connect(files.main_db)
+    cursor = con.cursor()
+    try:
+        cursor.execute("INSERT INTO admins (id, username) VALUES (" + str(his_id) + ", '" + str(his_username) + "');")
+    except:
+        cursor.execute("CREATE TABLE admins (id INT, username TEXT);")
+        cursor.execute("INSERT INTO admins (id, username) VALUES (" + str(his_id) + ", '" + str(his_username) + "');")
+
+    con.commit()
+    con.close()
 
 
-def new_moder(his_id):
-    with open(files.moders_list, encoding='utf-8') as f:
-        if not str(his_id) in f.read():
-            with open(files.moders_list, 'a', encoding='utf-8') as f: f.write(str(his_id) + '\n')
+def new_moder(his_id, his_username):
+    con = sqlite3.connect(files.main_db)
+    cursor = con.cursor()
+    try:
+        cursor.execute("INSERT INTO moders (id, username) VALUES (" + str(his_id) + ", '" + str(his_username) + "');")
+    except:
+        cursor.execute("CREATE TABLE moders (id INT, username TEXT);")
+        cursor.execute("INSERT INTO moders (id, username) VALUES (" + str(his_id) + ", '" + str(his_username) + "');")
+
+    con.commit()
+    con.close()
 
 
 def get_state(chat_id):
@@ -56,45 +92,81 @@ def get_state(chat_id):
 
 # запись в список пользователей
 # если 0 в качестве входного аргумента, выводит список пользователей
-def user_logger(chat_id):
-    if chat_id == 0:
+def user_logger(his_id, his_username=None):
+    con = sqlite3.connect(files.main_db)
+    cursor = con.cursor()
+
+    if his_id == 0:
         users_list = []
-        with open(files.users_list, encoding='utf-8') as f:
-            for user_id in f.readlines():
-                users_list.append(int(user_id))
+        a = 0
+        try:
+            cursor.execute("SELECT id, username FROM users;")
+        except:
+            cursor.execute("CREATE TABLE users (id INT, username TEXT);")
+
+        for id_u, name in cursor.fetchall():
+            a += 1
+            group = (id_u, name)
+            users_list.append(group)
+
+        con.close()
         return users_list
     else:
-        if chat_id not in get_admin_list():
-            with open(files.users_list, encoding='utf-8') as f:
-                if not str(chat_id) in f.read():
-                    with open(files.users_list, 'a', encoding='utf-8') as f: f.write(str(chat_id) + '\n')
+        try:
+            cursor.execute(
+                "INSERT INTO users (id, username) VALUES (" + his_id + ", '" + str(his_username) + "');")
+        except:
+            cursor.execute("CREATE TABLE users (id INT, username TEXT);")
+            cursor.execute(
+                "INSERT INTO users (id, username) VALUES (" + his_id + ", '" + str(his_username) + "');")
+
+        con.commit()
+        con.close()
 
 
 # запись в список групп
 # если 0 в качестве входного аргумента, выводит список групп
-def chat_logger(chat_id, chat_title=None, chat_name=None):
+def chat_logger(chat_id, chat_name=None, chat_link=None):
+    con = sqlite3.connect(files.main_db)
+    cursor = con.cursor()
+
     if chat_id == 0:
         chats_list = []
-        with open(files.chats_list, encoding='utf-8') as f:
-            for chat_id in f.readlines():
-                chats_list.append(chat_id)
+        a = 0
+        try:
+            cursor.execute("SELECT id, name, link FROM groups;")
+        except:
+            cursor.execute("CREATE TABLE groups (id INT, name TEXT, link TEXT);")
+
+        for id_g, name, link in cursor.fetchall():
+            a += 1
+            group = (id_g, name, link)
+            chats_list.append(group)
+
+        con.close()
         return chats_list
     else:
-        if chat_id not in get_admin_list():
-            with open(files.chats_list, encoding='utf-8') as f:
-                if not str(chat_id) in f.read():
-                    if chat_name is not None:
-                        with open(files.chats_list, 'a', encoding='utf-8') as f:
-                            f.write("(" + str(chat_id) +
-                                    "; " + str(chat_title) +
-                                    "; t.me/" +
-                                    str(chat_name) + ")\n")
-                    else:
-                        with open(files.chats_list, 'a', encoding='utf-8') as f:
-                            f.write("(" + str(chat_id) +
-                                    "; " + str(chat_title) +
-                                    "; " +
-                                    "Closed group" + ")\n")
+        if chat_link is not None:
+            try:
+                cursor.execute(
+                    "INSERT INTO groups (id, name, link) VALUES (" + chat_id + ", '" + str(chat_name) +
+                    "', '" + str(chat_link) + "');")
+            except:
+                cursor.execute("CREATE TABLE groups (id INT, name TEXT, link URL);")
+                cursor.execute(
+                    "INSERT INTO groups (id, name, link) VALUES (" + chat_id + ", '" + str(chat_name) +
+                    "', '" + str(chat_link) + "');")
+        else:
+            try:
+                cursor.execute(
+                    "INSERT INTO groups (id, name) VALUES (" + chat_id + ", " + str(chat_name) + ");")
+            except:
+                cursor.execute("CREATE TABLE groups (id INT, name TEXT, link URL);")
+                cursor.execute(
+                    "INSERT INTO groups (id, name) VALUES (" + chat_id + ", " + str(chat_name) + ");")
+
+        con.commit()
+        con.close()
 
 
 def new_blocked_user(his_id):
@@ -109,17 +181,13 @@ def check_message(message):
             return False
 
 
-def del_id(file, chat_id):
-    text = ''
-    with open(file, encoding='utf-8') as f:
-        for i in f.readlines():
-            i = i[:len(i) - 1]
-            if str(chat_id) == i:
-                pass
-            else:
-                text += i + '\n'
-    with open(file, 'w', encoding='utf-8') as f:
-        f.write(text)
+def del_id(table, id_for_del):
+    con = sqlite3.connect(files.main_db)
+    cursor = con.cursor()
+
+    cursor.execute("DELETE FROM " + str(table) + " WHERE id = " + str(id_for_del) + ";")
+    con.commit()
+    con.close()
 
 
 # изменение настроек бота и запись в файл настроек
@@ -128,7 +196,8 @@ def change_settings(settings):
         'Settings':
             {
                 'HotEventNotification': settings.hot_event_setting,
-                'NewEventNotification': settings.new_event_setting
+                'NewEventNotification': settings.new_event_setting,
+                'TimeZone': settings.time_zone
             }
                     }
     with open(files.settings, 'w') as f:
@@ -197,27 +266,26 @@ async def mailing(bot, creation_event):
 
     for user in user_logger(get_list):
         try:
-            await bot.send_message(int(user), f"Было добавлено новое событие!\n\n"
+            await bot.send_message(user[0], f"Было добавлено новое событие!\n\n"
                                               f"{str(creation_event.name)} - {str(creation_event.date)} МСК - "
                                               f"{str(creation_event.description)}", entities=entity_list)
-            await log(f"User {int(user)} got 'New event' message")
+            await log(f"User {user[0]} got 'New event' message")
         except:
-            await log(f"User {int(user)} didn't get 'New event' message")
+            await log(f"User {user[0]} didn't get 'New event' message")
 
-            new_user_list = ''
-            with open(files.users_list, "r", encoding='utf-8', ) as f:
-                for user_id in f.readlines():
-                    if str(user) in user_id:
-                        continue
-                    else:
-                        new_user_list += user_id
-            with open(files.users_list, "w", encoding='utf-8', ) as f:
-                f.write(new_user_list)
+            con = sqlite3.connect(files.main_db)
+            cursor = con.cursor()
+            try:
+                cursor.execute("SELECT id FROM users WHERE id = " + str(user[0]) + ";")
+            except:
+                pass
+            else:
+                cursor.execute("DELETE FROM users WHERE id = " + str(user[0]) + ";")
+                con.commit()
+            con.close()
 
     for chat in chat_logger(get_list):
-        chat = chat.replace('(', '')
-        chat = chat.replace(')', '')
-        chat = chat.split('; ')
+
         try:
             await bot.send_message(int(chat[0]), f"Было добавлено новое событие!\n\n"
                                                  f"{str(creation_event.name)} - {str(creation_event.date)} МСК - "
@@ -226,15 +294,16 @@ async def mailing(bot, creation_event):
         except:
             await log(f"Chat {int(chat[0])} didn't get 'New event' message")
 
-            new_chat_str = ''
-            with open(files.chats_list, "r", encoding='utf-8', ) as f:
-                for chat_id in f.readlines():
-                    if chat[0] in chat_id:
-                        continue
-                    else:
-                        new_chat_str += chat_id
-            with open(files.chats_list, "w", encoding='utf-8', ) as f:
-                f.write(new_chat_str)
+            con = sqlite3.connect(files.main_db)
+            cursor = con.cursor()
+            try:
+                cursor.execute("SELECT id FROM groups WHERE id = " + str(chat[0]) + ";")
+            except:
+                pass
+            else:
+                cursor.execute("DELETE FROM groups WHERE id = " + str(chat[0]) + ";")
+                con.commit()
+            con.close()
 
 
 # рассылка уведомления о скором приближении события
@@ -293,27 +362,26 @@ async def hot_notification(bot, hot_event):
 
     for user in user_logger(get_list):
         try:
-            await bot.send_message(int(user), f"Осталось меньше часа до события:\n\n"
+            await bot.send_message(user[0], f"Осталось меньше часа до события:\n\n"
                                               f"🔥 {str(hot_event[0])} - {str(hot_event[2])} МСК - "
                                               f"{str(hot_event[1])}", entities=entity_list)
-            await log(f"User {int(user)} got 'Hot event' message")
+            await log(f"User {user[0]} got 'Hot event' message")
         except:
-            await log(f"User {int(user)} didn't get 'Hot event' message")
+            await log(f"User {user[0]} didn't get 'Hot event' message")
 
-            new_user_list = ''
-            with open(files.users_list, "r", encoding='utf-8', ) as f:
-                for user_id in f.readlines():
-                    if str(user) in user_id:
-                        continue
-                    else:
-                        new_user_list += user_id
-            with open(files.users_list, "w", encoding='utf-8', ) as f:
-                f.write(new_user_list)
+            con = sqlite3.connect(files.main_db)
+            cursor = con.cursor()
+            try:
+                cursor.execute("SELECT id FROM users WHERE id = " + str(user[0]) + ";")
+            except:
+                pass
+            else:
+                cursor.execute("DELETE FROM users WHERE id = " + str(user[0]) + ";")
+                con.commit()
+            con.close()
 
     for chat in chat_logger(get_list):
-        chat = chat.replace('(', '')
-        chat = chat.replace(')', '')
-        chat = chat.split('; ')
+
         try:
             await bot.send_message(int(chat[0]), f"Осталось меньше часа до события:\n\n"
                                                  f"🔥 {str(hot_event[0])} - {str(hot_event[2])} МСК - "
@@ -322,15 +390,16 @@ async def hot_notification(bot, hot_event):
         except:
             await log(f"Chat {int(chat[0])} didn't get 'Hot event' message")
 
-            new_chat_list = ''
-            with open(files.chats_list, "r", encoding='utf-8',) as f:
-                for chat_id in f.readlines():
-                    if chat[0] in chat_id:
-                        continue
-                    else:
-                        new_chat_list += chat_id
-            with open(files.chats_list, "w", encoding='utf-8',) as f:
-                f.write(new_chat_list)
+            con = sqlite3.connect(files.main_db)
+            cursor = con.cursor()
+            try:
+                cursor.execute("SELECT id FROM groups WHERE id = " + str(chat[0]) + ";")
+            except:
+                pass
+            else:
+                cursor.execute("DELETE FROM groups WHERE id = " + str(chat[0]) + ";")
+                con.commit()
+            con.close()
 
 
 # постраничный вывод списков событий
