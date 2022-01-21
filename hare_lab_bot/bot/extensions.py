@@ -11,13 +11,20 @@ logging.basicConfig(filename=files.system_log, format='%(levelname)s:%(name)s:%(
 # класс по настройке бота
 class Settings:
     def __init__(self):
-        self.file_settings = open(files.settings, 'r')  # открываем файл для чтения
-        self.settings = yaml.safe_load(self.file_settings)
-        self.time_zone = str(self.settings['Settings']['TimeZone'])
-        self.channel_name = str(self.settings['Settings']['ChannelName'])
-        self.channel_id = str(self.settings['Settings']['ChannelID'])
-        self.threshold_xp = int(self.settings['Settings']['ThresholdXP'])
-        self.file_settings.close()
+        self.file_settings_local = open(files.settings_local, 'r')  # открываем файл для чтения
+        self.settings = yaml.safe_load(self.file_settings_local)
+        self.time_zone = str(self.settings['Settings_local']['TimeZone'])
+        self.threshold_xp = int(self.settings['Settings_local']['ThresholdXP'])
+        self.file_settings_local.close()
+
+        self.file_settings_global = open(files.settings_global, 'r')  # открываем файл для чтения
+        self.settings_global = yaml.safe_load(self.file_settings_global)
+        self.channel_name = str(self.settings_global['Settings_channel']['ChannelName'])
+        self.channel_id = str(self.settings_global['Settings_channel']['ChannelID'])
+        self.url_csv = f'https://combot.org/c/{self.channel_id}/chat_users/v2?csv=yes&limit=3000&skip=0'
+        self.token = self.settings_global['Settings_bot']['Token']
+        logging.info('Token was set')
+        self.file_settings_global.close()
 
         con = sqlite3.connect(files.main_db)
         cursor = con.cursor()
@@ -37,34 +44,5 @@ class Settings:
 
         con.close()
 
-        self.url_csv = f'https://combot.org/c/{self.channel_id}/chat_users/v2?csv=yes&limit=3000&skip=0'
         self.url_one_time_link = ''
         self.session = None
-
-    def __enter__(self):  # обработчик входа в контекстный менеджер
-        self.file_token = open(files.token, 'r')  # открываем файл для чтения
-        self.TOKEN = yaml.safe_load(self.file_token)
-        logging.info('Token was set')
-        return self.TOKEN['TOKEN']
-
-    def __exit__(self, exc_type, exc_val, exc_tb):  # обработчик выхода из контекстного менеджера
-        self.file_token.close()
-
-
-# класс поста (используется при создании постов и редактировании, как хранилище данных до записи в базу)
-class Post:
-    def __init__(self):
-        self.author_id: int = 0
-        self.author_name: str = ''
-        self.post_name: str = ''
-        self.post_date: str = ''
-        self.post_desc: str = ''
-        self.what_needs: str = ''
-        self.hashtags: str = ''
-        self.pic_post: str = ''
-        self.name_entities: dict = {}
-        self.desc_entities: dict = {}
-        self.date_entities: dict = {}
-        self.what_needs_entities: dict = {}
-        self.status: int = 0
-        self.message_id: int = 0

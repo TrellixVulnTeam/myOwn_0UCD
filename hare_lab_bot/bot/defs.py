@@ -166,6 +166,109 @@ def check_message(message):
             return False
 
 
+def set_chat_value_message(message, mode, pic_src=''):
+    if mode == 1:
+        with shelve.open(files.bot_message_bd) as bd:
+            bd[str(message.chat.id)] = {
+                'author_id': str(message.chat.id),
+                'author_name': str(message.chat.username),
+                'post_name': str(message.text),
+                'name_entities': str(message)
+            }
+
+    elif mode == 2:
+        with shelve.open(files.bot_message_bd) as bd:
+            temp_dict = bd[str(message.chat.id)]
+            temp_dict.update({'post_desc': str(message.text), 'desc_entities': str(message)})
+            bd[str(message.chat.id)] = temp_dict
+
+    elif mode == 3:
+        if 'Есть ли дата проведения события или дедлайн?' in message.text:
+            temp_text = ''
+            temp_entities = {}
+        else:
+            temp_text = message.text
+            temp_entities = message
+
+        with shelve.open(files.bot_message_bd) as bd:
+            temp_dict = bd[str(message.chat.id)]
+            temp_dict.update({'post_date': str(temp_text), 'date_entities': str(temp_entities)})
+            bd[str(message.chat.id)] = temp_dict
+
+    elif mode == 4:
+        if 'Нужно ли что-то сделать для участия?' in message.text:
+            temp_text = ''
+            temp_entities = {}
+        else:
+            temp_text = message.text
+            temp_entities = message
+
+        with shelve.open(files.bot_message_bd) as bd:
+            temp_dict = bd[str(message.chat.id)]
+            temp_dict.update({'what_needs': str(temp_text), 'what_needs_entities': str(temp_entities)})
+            bd[str(message.chat.id)] = temp_dict
+
+    elif mode == 5:
+        if 'Есть ли сайт у проекта?' in message.text:
+            temp_text = ''
+        else:
+            temp_text = message.text
+
+        with shelve.open(files.bot_message_bd) as bd:
+            temp_dict = bd[str(message.chat.id)]
+            temp_dict.update({'site': str(temp_text)})
+            bd[str(message.chat.id)] = temp_dict
+
+    elif mode == 6:
+        if 'Есть ли твиттер у проекта?' in message.text:
+            temp_text = ''
+        else:
+            temp_text = message.text
+
+        with shelve.open(files.bot_message_bd) as bd:
+            temp_dict = bd[str(message.chat.id)]
+            temp_dict.update({'twitter': str(temp_text)})
+            bd[str(message.chat.id)] = temp_dict
+
+    elif mode == 7:
+        if 'Есть ли дискорд у проекта?' in message.text:
+            temp_text = ''
+        else:
+            temp_text = message.text
+
+        with shelve.open(files.bot_message_bd) as bd:
+            temp_dict = bd[str(message.chat.id)]
+            temp_dict.update({'discord': str(temp_text)})
+            bd[str(message.chat.id)] = temp_dict
+
+    elif mode == 8:
+        with shelve.open(files.bot_message_bd) as bd:
+            temp_dict = bd[str(message.chat.id)]
+            temp_dict.update({'pic_post': str(pic_src)})
+            bd[str(message.chat.id)] = temp_dict
+
+    elif mode == 9:
+        with shelve.open(files.bot_message_bd) as bd:
+            temp_dict = bd[str(message.chat.id)]
+            temp_dict.update({'hashtags': str(message.text), 'status': 0})
+            bd[str(message.chat.id)] = temp_dict
+
+
+def get_chat_value_message(message):
+    with shelve.open(files.bot_message_bd) as bd:
+        try:
+            value = bd[str(message.chat.id)]
+        except:
+            return False
+        else:
+            return value
+
+
+def delete_chat_value_message(message):
+    with shelve.open(files.bot_message_bd) as bd:
+        del bd[str(message.chat.id)]
+
+
 def del_id(table, id_for_del):
     con = sqlite3.connect(files.main_db)
     cursor = con.cursor()
@@ -178,22 +281,14 @@ def del_id(table, id_for_del):
 # изменение настроек бота и запись в файл настроек
 def change_settings(settings):
     new_settings = {
-        'Settings':
+        'Settings_local':
             {
-                'TimeZone': settings.time_zone,
-                'ChannelName': settings.channel_name,
-                'ChannelID': settings.channel_id,
-                'ThresholdXP': settings.threshold_xp
+                'ThresholdXP': settings.threshold_xp,
+                'TimeZone': settings.time_zone
             }
                     }
-    with open(files.settings, 'w') as f:
+    with open(files.settings_local, 'w') as f:
         yaml.dump(new_settings, f)
-
-
-# изменение фразы и сохранение её в файл
-def change_phrase(phrase, file):
-    with open(file, 'w', encoding='utf-8') as f:
-        f.write(str(phrase) + '\n')
 
 
 async def get_csv(bot, settings):
@@ -246,30 +341,48 @@ async def get_csv(bot, settings):
 async def preview(bot, message, preview_post, settings):
     '''preview'''
     entity_list = []
-    if preview_post.post_date == '':
-        preview_post.post_date = 'Нет даты проведения'
-    if preview_post.what_needs == '':
-        preview_post.what_needs = 'Нет требований'
-    name_entities = json.loads(str(preview_post.name_entities))
-    description_entities = json.loads(str(preview_post.desc_entities))
-    date_entities = json.loads(str(preview_post.date_entities))
-    what_needs_entities = json.loads(str(preview_post.what_needs_entities))
-    footer_text_entities = json.loads(str(settings.footer_text_entities))
-    text = f'{preview_post.post_name}\n\n' \
-           f'{preview_post.post_desc}\n\n' \
-           f'✅ {preview_post.what_needs}\n\n' \
-           f'📆 {preview_post.post_date}\n\n' \
-           f'{preview_post.hashtags}\n\n' \
-           f'Автор: @{preview_post.author_name}\n' \
-           f'{settings.footer_text}'
+    text = f"{preview_post['post_name']}\n\n" \
+           f"{preview_post['post_desc']}\n\n"
 
-    if type(preview_post.pic_post) is tuple:
-        if preview_post.pic_post[0] == '':
+    if preview_post['what_needs'] != '':
+        text += f"✅ {preview_post['what_needs']}\n\n"
+
+    if preview_post['post_date'] != '':
+        text += f"📆 {preview_post['post_date']}\n\n"
+
+    if preview_post['site'] != '' or preview_post['twitter'] != '' or preview_post['discord'] != '':
+        text += "🔗 "
+        if preview_post['site'] != '':
+            text += "Сайт проекта "
+        if preview_post['twitter'] != '':
+            if preview_post['site'] == '':
+                text += "Twitter "
+            else:
+                text += "| Twitter "
+        if preview_post['discord'] != '':
+            if preview_post['site'] == '' and preview_post['twitter'] == '':
+                text += "Discord"
+            else:
+                text += "| Discord"
+        text += "\n\n"
+
+    text += f"{preview_post['hashtags']}\n\n" \
+            f"Автор: @{preview_post['author_name']}\n" \
+            f"{settings.footer_text}"
+
+    name_entities = json.loads(str(preview_post['name_entities']))
+    description_entities = json.loads(str(preview_post['desc_entities']))
+    date_entities = json.loads(str(preview_post['date_entities']))
+    what_needs_entities = json.loads(str(preview_post['what_needs_entities']))
+    footer_text_entities = json.loads(settings.footer_text_entities)
+
+    if type(preview_post['pic_post']) is tuple:
+        if preview_post['pic_post'][0] == '':
             text_format_char = 4096
         else:
             text_format_char = 1024
     else:
-        if preview_post.pic_post == '':
+        if preview_post['pic_post'] == '':
             text_format_char = 4096
         else:
             text_format_char = 1024
@@ -278,7 +391,7 @@ async def preview(bot, message, preview_post, settings):
 
     entity = MessageEntity(type="bold",
                            offset=count_string_track,
-                           length=len(preview_post.post_name))
+                           length=len(preview_post['post_name']))
     entity_list.append(entity)
 
     if "entities" in name_entities:
@@ -291,19 +404,15 @@ async def preview(bot, message, preview_post, settings):
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2], url=entity_values_list[3])
                 entity_list.append(entity)
-            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
-                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
-                    (entity["type"] == "bot_command") or \
-                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
-                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
-                    or (entity["type"] == "code"):
+            elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                    "email", "phone_number", "bold", "italic", "underline",
+                                    "strikethrough", "code"]:
                 entity = MessageEntity(type=entity_values_list[0],
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2])
                 entity_list.append(entity)
 
-    count_string_track += len(str(preview_post.post_name)) + 2
+    count_string_track += len(str(preview_post['post_name'])) + len("\n\n")
 
     if "entities" in description_entities:
 
@@ -315,74 +424,111 @@ async def preview(bot, message, preview_post, settings):
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2], url=entity_values_list[3])
                 entity_list.append(entity)
-            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
-                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
-                    (entity["type"] == "bot_command") or \
-                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
-                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
-                    or (entity["type"] == "code"):
+            elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                    "email", "phone_number", "bold", "italic", "underline",
+                                    "strikethrough", "code"]:
                 entity = MessageEntity(type=entity_values_list[0],
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2])
                 entity_list.append(entity)
 
-    count_string_track += len(str(preview_post.post_desc)) + len(str('\n\n✅ '))
+    count_string_track += len(str(preview_post['post_desc'])) + len("\n\n")
 
-    if "entities" in what_needs_entities:
+    if preview_post['what_needs'] != '':
+        count_string_track += len(str('✅ '))
 
-        for entity in what_needs_entities["entities"]:
-            entity_values_list = list(entity.values())
+        if "entities" in what_needs_entities:
 
-            if entity["type"] == "text_link":
-                entity = MessageEntity(type=entity_values_list[0],
-                                       offset=count_string_track + entity_values_list[1],
-                                       length=entity_values_list[2], url=entity_values_list[3])
+            for entity in what_needs_entities["entities"]:
+                entity_values_list = list(entity.values())
+
+                if entity["type"] == "text_link":
+                    entity = MessageEntity(type=entity_values_list[0],
+                                           offset=count_string_track + entity_values_list[1],
+                                           length=entity_values_list[2], url=entity_values_list[3])
+                    entity_list.append(entity)
+                elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                        "email", "phone_number", "bold", "italic", "underline",
+                                        "strikethrough", "code"]:
+                    entity = MessageEntity(type=entity_values_list[0],
+                                           offset=count_string_track + entity_values_list[1],
+                                           length=entity_values_list[2])
+                    entity_list.append(entity)
+
+        count_string_track += len(str(preview_post['what_needs'])) + len("\n\n")
+
+    if preview_post['post_date'] != '':
+        count_string_track += len(str('📆 ')) + 1
+
+        if "entities" in date_entities:
+
+            for entity in date_entities["entities"]:
+                entity_values_list = list(entity.values())
+
+                if entity["type"] == "text_link":
+                    entity = MessageEntity(type=entity_values_list[0],
+                                           offset=count_string_track + entity_values_list[1],
+                                           length=entity_values_list[2], url=entity_values_list[3])
+                    entity_list.append(entity)
+                elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                        "email", "phone_number", "bold", "italic", "underline",
+                                        "strikethrough", "code"]:
+                    entity = MessageEntity(type=entity_values_list[0],
+                                           offset=count_string_track + entity_values_list[1],
+                                           length=entity_values_list[2])
+                    entity_list.append(entity)
+
+        count_string_track += len(str(preview_post['post_date'])) + len("\n\n")
+
+    if preview_post['site'] != '' or preview_post['twitter'] != '' or preview_post['discord'] != '':
+        count_string_track += len("🔗 ") + 1
+        if preview_post['site'] != '':
+            entity = MessageEntity(type="text_link",
+                                   offset=count_string_track,
+                                   length=len("Сайт проекта"),
+                                   url=f"{preview_post['site']}")
+            entity_list.append(entity)
+            count_string_track += len("Сайт проекта ")
+        if preview_post['twitter'] != '':
+            if preview_post['site'] == '':
+                entity = MessageEntity(type="text_link",
+                                       offset=count_string_track,
+                                       length=len("Twitter"),
+                                       url=f"{preview_post['twitter']}")
                 entity_list.append(entity)
-            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
-                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
-                    (entity["type"] == "bot_command") or \
-                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
-                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
-                    or (entity["type"] == "code"):
-                entity = MessageEntity(type=entity_values_list[0],
-                                       offset=count_string_track + entity_values_list[1],
-                                       length=entity_values_list[2])
+                count_string_track += len("Twitter ")
+            else:
+                entity = MessageEntity(type="text_link",
+                                       offset=count_string_track + len("| "),
+                                       length=len("Twitter"),
+                                       url=f"{preview_post['twitter']}")
                 entity_list.append(entity)
-
-    count_string_track += len(str(preview_post.what_needs)) + len(str('\n\n📆 '))
-
-    if "entities" in date_entities:
-
-        for entity in date_entities["entities"]:
-            entity_values_list = list(entity.values())
-
-            if entity["type"] == "text_link":
-                entity = MessageEntity(type=entity_values_list[0],
-                                       offset=count_string_track + entity_values_list[1],
-                                       length=entity_values_list[2], url=entity_values_list[3])
+                count_string_track += len("| Twitter ")
+        if preview_post['discord'] != '':
+            if preview_post['site'] == '' and preview_post['twitter'] == '':
+                entity = MessageEntity(type="text_link",
+                                       offset=count_string_track,
+                                       length=len("Discord"),
+                                       url=f"{preview_post['discord']}")
                 entity_list.append(entity)
-            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
-                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
-                    (entity["type"] == "bot_command") or \
-                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
-                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
-                    or (entity["type"] == "code"):
-                entity = MessageEntity(type=entity_values_list[0],
-                                       offset=count_string_track + entity_values_list[1],
-                                       length=entity_values_list[2])
+                count_string_track += len("Discord")
+            else:
+                entity = MessageEntity(type="text_link",
+                                       offset=count_string_track + len("| "),
+                                       length=len("Discord"),
+                                       url=f"{preview_post['discord']}")
                 entity_list.append(entity)
+                count_string_track += len("| Discord")
+        count_string_track += len("\n\n")
 
-    count_string_track += len(str(preview_post.post_date)) + 2 + len(str(preview_post.hashtags)) + 3
+    count_string_track += len(str(preview_post['hashtags'])) + len("\n\n")
 
     entity = MessageEntity(type="italic",
                            offset=count_string_track,
                            length=len('Автор'))
     entity_list.append(entity)
 
-    count_string_track += len(f'Автор: @{preview_post.author_name}\n')
+    count_string_track += len(f"Автор: @{preview_post['author_name']}\n")
 
     if "entities" in footer_text_entities:
 
@@ -394,71 +540,96 @@ async def preview(bot, message, preview_post, settings):
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2], url=entity_values_list[3])
                 entity_list.append(entity)
-            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
-                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
-                    (entity["type"] == "bot_command") or \
-                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
-                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
-                    or (entity["type"] == "code"):
+            elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                    "email", "phone_number", "bold", "italic", "underline",
+                                    "strikethrough", "code"]:
                 entity = MessageEntity(type=entity_values_list[0],
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2])
                 entity_list.append(entity)
 
     inline_status = InlineKeyboardMarkup()
-    inline_status.add(InlineKeyboardButton(text=f"Статус: {'размещён' if preview_post.status else 'не размещён'}",
+    inline_status.add(InlineKeyboardButton(text=f"Статус: {'размещён' if preview_post['status'] else 'не размещён'}",
                                            callback_data='status'))
 
     try:
-        if type(preview_post.pic_post) is tuple:
-            if preview_post.pic_post[0] == '':
+        if type(preview_post['pic_post']) is tuple:
+            if preview_post['pic_post'][0] == '':
                 await bot.send_message(message.chat.id, text, entities=entity_list, reply_markup=inline_status)
+                return True
             else:
-                photo = open(preview_post.pic_post[0], 'rb')
+                photo = open(preview_post['pic_post'][0], 'rb')
                 await bot.send_photo(message.chat.id, photo, caption=text, caption_entities=entity_list,
                                      reply_markup=inline_status)
+                return True
         else:
-            if preview_post.pic_post == '':
+            if preview_post['pic_post'] == '':
                 await bot.send_message(message.chat.id, text, entities=entity_list, reply_markup=inline_status)
+                return True
             else:
-                photo = open(preview_post.pic_post, 'rb')
+                photo = open(preview_post['pic_post'], 'rb')
                 await bot.send_photo(message.chat.id, photo, caption=text, caption_entities=entity_list,
                                      reply_markup=inline_status)
+                return True
     except Exception as e:
+        print(e)
         if str(e) == 'Media_caption_too_long':
             await bot.send_message(message.chat.id, 'Пост слишком большой, нужно его сократить.\n'
                                                     f'Сейчас количество символов: {len(text)}.\n'
                                                     f'Должно быть: {text_format_char}')
+            return False
+        if str(e) == 'Message is too long':
+            await bot.send_message(message.chat.id, 'Пост слишком большой, нужно его сократить.\n'
+                                                    f'Сейчас количество символов: {len(text)}.\n'
+                                                    f'Должно быть: {text_format_char}')
+            return False
 
 
 async def edit_post(bot, message, edited_post, settings, edit_picture):
     '''preview'''
     entity_list = []
-    if edited_post.post_date == '':
-        edited_post.post_date = 'Нет даты проведения'
-    if edited_post.what_needs == '':
-        edited_post.what_needs = 'Нет требований'
-    name_entities = json.loads(str(edited_post.name_entities))
-    description_entities = json.loads(str(edited_post.desc_entities))
-    date_entities = json.loads(str(edited_post.date_entities))
-    what_needs_entities = json.loads(str(edited_post.what_needs_entities))
-    footer_text_entities = json.loads(str(settings.footer_text_entities))
-    text = f'{edited_post.post_name}\n\n' \
-           f'{edited_post.post_desc}\n\n' \
-           f'✅ {edited_post.what_needs}\n\n' \
-           f'📆 {edited_post.post_date}\n\n' \
-           f'{edited_post.hashtags}\n\n' \
-           f'Автор: @{edited_post.author_name}\n' \
-           f'{settings.footer_text}'
+    text = f"{edited_post['post_name']}\n\n" \
+           f"{edited_post['post_desc']}\n\n"
 
-    if type(edited_post.pic_post) is tuple:
-        if edited_post.pic_post[0] == '':
+    if edited_post['what_needs'] != '':
+        text += f"✅ {edited_post['what_needs']}\n\n"
+
+    if edited_post['post_date'] != '':
+        text += f"📆 {edited_post['post_date']}\n\n"
+
+    if edited_post['site'] != '' or edited_post['twitter'] != '' or edited_post['discord'] != '':
+        text += "🔗 "
+        if edited_post['site'] != '':
+            text += "Сайт проекта "
+        if edited_post['twitter'] != '':
+            if edited_post['site'] == '':
+                text += "Twitter "
+            else:
+                text += "| Twitter "
+        if edited_post['discord'] != '':
+            if edited_post['site'] == '' and edited_post['twitter'] == '':
+                text += "Discord"
+            else:
+                text += "| Discord"
+        text += "\n\n"
+
+    text += f"{edited_post['hashtags']}\n\n" \
+            f"Автор: @{edited_post['author_name']}\n" \
+            f"{settings.footer_text}"
+
+    name_entities = json.loads(str(edited_post['name_entities']))
+    description_entities = json.loads(str(edited_post['desc_entities']))
+    date_entities = json.loads(str(edited_post['date_entities']))
+    what_needs_entities = json.loads(str(edited_post['what_needs_entities']))
+    footer_text_entities = json.loads(settings.footer_text_entities)
+
+    if type(edited_post['pic_post']) is tuple:
+        if edited_post['pic_post'][0] == '':
             text_format_char = 4096
         else:
             text_format_char = 1024
     else:
-        if edited_post.pic_post == '':
+        if edited_post['pic_post'] == '':
             text_format_char = 4096
         else:
             text_format_char = 1024
@@ -467,7 +638,7 @@ async def edit_post(bot, message, edited_post, settings, edit_picture):
 
     entity = MessageEntity(type="bold",
                            offset=count_string_track,
-                           length=len(edited_post.post_name))
+                           length=len(edited_post['post_name']))
     entity_list.append(entity)
 
     if "entities" in name_entities:
@@ -480,19 +651,15 @@ async def edit_post(bot, message, edited_post, settings, edit_picture):
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2], url=entity_values_list[3])
                 entity_list.append(entity)
-            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
-                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
-                    (entity["type"] == "bot_command") or \
-                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
-                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
-                    or (entity["type"] == "code"):
+            elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                    "email", "phone_number", "bold", "italic", "underline",
+                                    "strikethrough", "code"]:
                 entity = MessageEntity(type=entity_values_list[0],
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2])
                 entity_list.append(entity)
 
-    count_string_track += len(str(edited_post.post_name)) + 2
+    count_string_track += len(str(edited_post['post_name'])) + len("\n\n")
 
     if "entities" in description_entities:
 
@@ -504,74 +671,111 @@ async def edit_post(bot, message, edited_post, settings, edit_picture):
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2], url=entity_values_list[3])
                 entity_list.append(entity)
-            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
-                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
-                    (entity["type"] == "bot_command") or \
-                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
-                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
-                    or (entity["type"] == "code"):
+            elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                    "email", "phone_number", "bold", "italic", "underline",
+                                    "strikethrough", "code"]:
                 entity = MessageEntity(type=entity_values_list[0],
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2])
                 entity_list.append(entity)
 
-    count_string_track += len(str(edited_post.post_desc)) + len(str('\n\n✅ '))
+    count_string_track += len(str(edited_post['post_desc'])) + len("\n\n")
 
-    if "entities" in what_needs_entities:
+    if edited_post['what_needs'] != '':
+        count_string_track += len(str('✅ '))
 
-        for entity in what_needs_entities["entities"]:
-            entity_values_list = list(entity.values())
+        if "entities" in what_needs_entities:
 
-            if entity["type"] == "text_link":
-                entity = MessageEntity(type=entity_values_list[0],
-                                       offset=count_string_track + entity_values_list[1],
-                                       length=entity_values_list[2], url=entity_values_list[3])
+            for entity in what_needs_entities["entities"]:
+                entity_values_list = list(entity.values())
+
+                if entity["type"] == "text_link":
+                    entity = MessageEntity(type=entity_values_list[0],
+                                           offset=count_string_track + entity_values_list[1],
+                                           length=entity_values_list[2], url=entity_values_list[3])
+                    entity_list.append(entity)
+                elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                        "email", "phone_number", "bold", "italic", "underline",
+                                        "strikethrough", "code"]:
+                    entity = MessageEntity(type=entity_values_list[0],
+                                           offset=count_string_track + entity_values_list[1],
+                                           length=entity_values_list[2])
+                    entity_list.append(entity)
+
+        count_string_track += len(str(edited_post['what_needs'])) + len("\n\n")
+
+    if edited_post['post_date'] != '':
+        count_string_track += len(str('📆 ')) + 1
+
+        if "entities" in date_entities:
+
+            for entity in date_entities["entities"]:
+                entity_values_list = list(entity.values())
+
+                if entity["type"] == "text_link":
+                    entity = MessageEntity(type=entity_values_list[0],
+                                           offset=count_string_track + entity_values_list[1],
+                                           length=entity_values_list[2], url=entity_values_list[3])
+                    entity_list.append(entity)
+                elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                        "email", "phone_number", "bold", "italic", "underline",
+                                        "strikethrough", "code"]:
+                    entity = MessageEntity(type=entity_values_list[0],
+                                           offset=count_string_track + entity_values_list[1],
+                                           length=entity_values_list[2])
+                    entity_list.append(entity)
+
+        count_string_track += len(str(edited_post['post_date'])) + len("\n\n")
+
+    if edited_post['site'] != '' or edited_post['twitter'] != '' or edited_post['discord'] != '':
+        count_string_track += len("🔗 ") + 1
+        if edited_post['site'] != '':
+            entity = MessageEntity(type="text_link",
+                                   offset=count_string_track,
+                                   length=len("Сайт проекта"),
+                                   url=f"{edited_post['site']}")
+            entity_list.append(entity)
+            count_string_track += len("Сайт проекта ")
+        if edited_post['twitter'] != '':
+            if edited_post['site'] == '':
+                entity = MessageEntity(type="text_link",
+                                       offset=count_string_track,
+                                       length=len("Twitter"),
+                                       url=f"{edited_post['twitter']}")
                 entity_list.append(entity)
-            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
-                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
-                    (entity["type"] == "bot_command") or \
-                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
-                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
-                    or (entity["type"] == "code"):
-                entity = MessageEntity(type=entity_values_list[0],
-                                       offset=count_string_track + entity_values_list[1],
-                                       length=entity_values_list[2])
+                count_string_track += len("Twitter ")
+            else:
+                entity = MessageEntity(type="text_link",
+                                       offset=count_string_track + len("| "),
+                                       length=len("Twitter"),
+                                       url=f"{edited_post['twitter']}")
                 entity_list.append(entity)
-
-    count_string_track += len(str(edited_post.what_needs)) + len(str('\n\n📆 '))
-
-    if "entities" in date_entities:
-
-        for entity in date_entities["entities"]:
-            entity_values_list = list(entity.values())
-
-            if entity["type"] == "text_link":
-                entity = MessageEntity(type=entity_values_list[0],
-                                       offset=count_string_track + entity_values_list[1],
-                                       length=entity_values_list[2], url=entity_values_list[3])
+                count_string_track += len("| Twitter ")
+        if edited_post['discord'] != '':
+            if edited_post['site'] == '' and edited_post['twitter'] == '':
+                entity = MessageEntity(type="text_link",
+                                       offset=count_string_track,
+                                       length=len("Discord"),
+                                       url=f"{edited_post['discord']}")
                 entity_list.append(entity)
-            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
-                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
-                    (entity["type"] == "bot_command") or \
-                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
-                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
-                    or (entity["type"] == "code"):
-                entity = MessageEntity(type=entity_values_list[0],
-                                       offset=count_string_track + entity_values_list[1],
-                                       length=entity_values_list[2])
+                count_string_track += len("Discord")
+            else:
+                entity = MessageEntity(type="text_link",
+                                       offset=count_string_track + len("| "),
+                                       length=len("Discord"),
+                                       url=f"{edited_post['discord']}")
                 entity_list.append(entity)
+                count_string_track += len("| Discord")
+        count_string_track += len("\n\n")
 
-    count_string_track += len(str(edited_post.post_date)) + 2 + len(str(edited_post.hashtags)) + 3
+    count_string_track += len(str(edited_post['hashtags'])) + len("\n\n")
 
     entity = MessageEntity(type="italic",
                            offset=count_string_track,
                            length=len('Автор'))
     entity_list.append(entity)
 
-    count_string_track += len(f'Автор: @{edited_post.author_name}\n')
+    count_string_track += len(f"Автор: @{edited_post['author_name']}\n")
 
     if "entities" in footer_text_entities:
 
@@ -583,45 +787,61 @@ async def edit_post(bot, message, edited_post, settings, edit_picture):
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2], url=entity_values_list[3])
                 entity_list.append(entity)
-            elif (entity["type"] == "mention") or (entity["type"] == "url") or \
-                    (entity["type"] == "hashtag") or (entity["type"] == "cashtag") or \
-                    (entity["type"] == "bot_command") or \
-                    (entity["type"] == "email") or (entity["type"] == "phone_number") or \
-                    (entity["type"] == "bold") or (entity["type"] == "italic") or \
-                    (entity["type"] == "underline") or (entity["type"] == "strikethrough") \
-                    or (entity["type"] == "code"):
+            elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                    "email", "phone_number", "bold", "italic", "underline",
+                                    "strikethrough", "code"]:
                 entity = MessageEntity(type=entity_values_list[0],
                                        offset=count_string_track + entity_values_list[1],
                                        length=entity_values_list[2])
                 entity_list.append(entity)
 
-    if edit_picture:
-        if type(edited_post.pic_post) is tuple:
-            if edited_post.pic_post[0] == '':
-                pass
+    try:
+        if edit_picture:
+            if type(edited_post['pic_post']) is tuple:
+                if edited_post['pic_post'][0] == '':
+                    return True
+                else:
+                    photo = open(edited_post['pic_post'][0], 'rb')
+                    await bot.edit_message_media(media=photo, chat_id=settings.channel_name,
+                                                 message_id=edited_post['message_id'])
+                    return True
             else:
-                photo = open(edited_post.pic_post[0], 'rb')
-                await bot.edit_message_media(media=photo, chat_id=settings.channel_name,
-                                             message_id=edited_post.message_id)
+                if edited_post['pic_post'] == '':
+                    return True
+                else:
+                    photo = open(edited_post['pic_post'], 'rb')
+                    await bot.edit_message_media(media=photo, chat_id=settings.channel_name,
+                                                 message_id=edited_post['message_id'])
+                    return True
         else:
-            if edited_post.pic_post == '':
-                pass
+            if type(edited_post['pic_post']) is tuple:
+                if edited_post['pic_post'][0] == '':
+                    await bot.edit_message_text(chat_id=settings.channel_name, message_id=edited_post['message_id'],
+                                                text=text, entities=entity_list)
+                    return True
+                else:
+                    await bot.edit_message_caption(chat_id=settings.channel_name, message_id=edited_post['message_id'],
+                                                   caption=text, caption_entities=entity_list)
+                    return True
             else:
-                photo = open(edited_post.pic_post, 'rb')
-                await bot.edit_message_media(media=photo, chat_id=settings.channel_name,
-                                             message_id=edited_post.message_id)
-    else:
-        if type(edited_post.pic_post) is tuple:
-            if edited_post.pic_post[0] == '':
-                await bot.edit_message_text(chat_id=settings.channel_name, message_id=edited_post.message_id,
-                                            text=text, entities=entity_list)
-            else:
-                await bot.edit_message_caption(chat_id=settings.channel_name, message_id=edited_post.message_id,
-                                               caption=text, caption_entities=entity_list)
-        else:
-            if edited_post.pic_post == '':
-                await bot.edit_message_text(chat_id=settings.channel_name, message_id=edited_post.message_id,
-                                            text=text, entities=entity_list)
-            else:
-                await bot.edit_message_caption(chat_id=settings.channel_name, message_id=edited_post.message_id,
-                                               caption=text, caption_entities=entity_list)
+                if edited_post['pic_post'] == '':
+                    await bot.edit_message_text(chat_id=settings.channel_name, message_id=edited_post['message_id'],
+                                                text=text, entities=entity_list)
+                    return True
+                else:
+                    await bot.edit_message_caption(chat_id=settings.channel_name, message_id=edited_post['message_id'],
+                                                   caption=text, caption_entities=entity_list)
+                    return True
+    except Exception as e:
+        print(e)
+        if str(e) == 'Media_caption_too_long':
+            await bot.send_message(message.chat.id, 'Пост слишком большой, нужно его сократить.\n'
+                                                    f'Сейчас количество символов: {len(text)}.\n'
+                                                    f'Должно быть: {text_format_char}')
+            return False
+        if str(e) == 'Message is too long':
+            await bot.send_message(message.chat.id, 'Пост слишком большой, нужно его сократить.\n'
+                                                    f'Сейчас количество символов: {len(text)}.\n'
+                                                    f'Должно быть: {text_format_char}')
+            return False
+

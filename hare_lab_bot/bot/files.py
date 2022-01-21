@@ -1,7 +1,7 @@
 main_db = 'data/db/main_data.db'
 
-settings = 'settings.yaml'
-token = 'token.yaml'
+settings_local = 'settings_local.yaml'
+settings_global = 'settings_global.yaml'
 
 state_bd = 'data/bd/sost.bd'
 bot_message_bd = 'data/bd/bot_message_bd.bd'
