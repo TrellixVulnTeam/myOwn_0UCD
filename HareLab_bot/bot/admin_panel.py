@@ -1,13 +1,18 @@
-import sqlite3
+# IDEA: сделать также изменение фразы для команды /start
 import shelve
+import sqlite3
+import requests
 import logging
 from aiogram.utils.json import json
 
-import files
-from defs import get_moder_list, get_state, log, delete_state, set_state, get_admin_list, get_author_list, preview, \
-    edit_post, new_author, del_id, get_chat_value_message, delete_chat_value_message, set_chat_value_message
-
 from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, MessageEntity
+import validators
+
+import files
+from config import admin_id
+from defs import get_admin_list, log, new_admin, get_state, del_id, get_moder_list, new_moder, \
+    get_author_list, new_author, get_csv, delete_state, set_state, preview, edit_post, change_settings, \
+    set_chat_value_message, delete_chat_value_message, get_chat_value_message
 
 # set logging level
 logging.basicConfig(filename=files.system_log, format='%(levelname)s:%(name)s:%(asctime)s:%(message)s',
@@ -16,20 +21,36 @@ logging.basicConfig(filename=files.system_log, format='%(levelname)s:%(name)s:%(
 main_menu = '🏠 Главное меню'
 
 
-async def moder_panel(bot, message):
+async def first_launch(bot, chat_id):
+    try:
+        with open(files.working_log, encoding='utf-8') as f:
+            return False
+    except:
+        await admin_panel(bot, chat_id, first__launch=True)
+        return True
+
+
+async def admin_panel(bot, message, first__launch=False):
     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
     user_markup.row('Посты')
     user_markup.row('Списки')
+    user_markup.row('Настройки бота')
+    if first__launch:
+        await bot.send_message(message.chat.id, "Добро пожаловать в админ панель. Это первый запуск бота.",
+                               reply_markup=user_markup)
+        await log(f'First launch admin panel of bot by admin {message.chat.id}')
+    else:
+        await bot.send_message(message.chat.id, "Добро пожаловать в админ панель.", reply_markup=user_markup)
 
-    await bot.send_message(message.chat.id, "Добро пожаловать в панель модератора.", reply_markup=user_markup)
-
-    await log(f'Launch moder panel of bot by moder {message.chat.id}')
+        await log(f'Launch admin panel of bot by admin {message.chat.id}')
 
 
-async def in_moder_panel(bot, settings, message):
+async def in_admin_panel(bot, settings, message):
     """
     Функция состоит из двух частей: в первой части обработка текстовых команд,
     во второй - обработка состояний переписки.
+    Вначале работы бота требуется вставить одноразовый ключ от Combot.
+    Состояние 55 отвечает за обработку этого ключа.
 
     При добавлении поста учитываются состояния 1, 2, 3, 4, 5, 6, 7, 8, 9, 10:
     1 - ввод темы поста,
@@ -69,14 +90,45 @@ async def in_moder_panel(bot, settings, message):
         где нужно вставить пересланное от пользователя сообщение (может сделать только один из админов )
     32 - удаление автора из списка (может сделать только один из админов)
 
+    При работе со списком админов - состояния 41, 42:
+    41 - добавление нового админа,
+        где нужно вставить пересланное от пользователя сообщение (может сделать только один из админов)
+    42 - удаление админа из списка (может сделать только один из админов)
+
+    При работе со списком модераторов - состояния 51, 52:
+    51 - добавление нового модератора,
+        где нужно вставить пересланное от пользователя сообщение (может сделать только один из админов)
+    52 - удаление модератора из списка (может сделать только один из админов)
+
+    При настройке бота - состояние 61, 62:
+    61 - изменений выводной фразы по команде /help
+    62 - изменение нижней подписи к постам
+    63 - изменение порога опыта для авторов
+
 
     :param bot: Bot from aiogram
     :param settings: object class: Settings from hare_bot.py
     :param message: types.Message from aiogram
     :return: None
     """
-    if message.chat.id in [message.chat.id for item in get_moder_list() if message.chat.id in item]:
-        if message.text == main_menu:
+
+    if message.chat.id in [message.chat.id for item in get_admin_list() if message.chat.id in item] or \
+            message.chat.id == admin_id:
+        if get_state(message.chat.id) == 55:
+            if 'https://combot.org/api/one_time_auth?hash=' in message.text and message.chat.id == admin_id:
+                settings.url_one_time_link = message.text
+                settings.session = requests.Session()
+                settings.session.get(settings.url_one_time_link)
+                logging.info('Session was opened')
+
+                delete_state(message.chat.id)
+
+                if await get_csv(bot, settings):
+                    await bot.send_message(admin_id, 'Спасибо, данные были обновлены.')
+            else:
+                await bot.send_message(admin_id, 'Сначала введите ссылку для получения доступа к csv файлу.')
+
+        elif message.text == main_menu:
             await bot.delete_message(message.chat.id, message.message_id)
             if get_state(message.chat.id):
                 delete_state(message.chat.id)
@@ -85,6 +137,7 @@ async def in_moder_panel(bot, settings, message):
             user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
             user_markup.row('Посты')
             user_markup.row('Списки')
+            user_markup.row('Настройки бота')
 
             await bot.send_message(message.chat.id, 'Вы в главном меню бота.',
                                    reply_markup=user_markup)
@@ -137,7 +190,7 @@ async def in_moder_panel(bot, settings, message):
                     count_string_track += len(author_name) + 3 + len('Posted' if status else 'Not posted') + 1
 
                     posts += str(a) + '. ' + str(post_name) + ' - ' + str(author_name) + \
-                              ' - ' + str('Posted' if status else 'Not posted') + '\n'
+                             ' - ' + str('Posted' if status else 'Not posted') + '\n'
 
                     if a % 10 == 0:
                         await bot.send_message(message.chat.id, posts, reply_markup=user_markup, entities=entity_list)
@@ -305,7 +358,7 @@ async def in_moder_panel(bot, settings, message):
 
         elif message.text == 'Изменить тему':
             await bot.delete_message(message.chat.id, message.message_id)
-            if get_state(message.chat.id) == 13 or get_state(message.chat.id) == 130:
+            if get_state(message.chat.id) in [13, 130]:
                 edition_post = get_chat_value_message(message)
 
                 con = sqlite3.connect(files.main_db)
@@ -317,6 +370,7 @@ async def in_moder_panel(bot, settings, message):
                     await bot.send_message(message.chat.id, 'Поста с такой темой нет!\nВыберите заново!')
                 else:
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                    user_markup.row('Назад')
                     user_markup.row(main_menu)
                     await bot.send_message(message.chat.id, 'Введите новую тему поста',
                                            parse_mode='Markdown', reply_markup=user_markup)
@@ -328,7 +382,7 @@ async def in_moder_panel(bot, settings, message):
 
         elif message.text == 'Изменить описание':
             await bot.delete_message(message.chat.id, message.message_id)
-            if get_state(message.chat.id) == 13 or get_state(message.chat.id) == 130:
+            if get_state(message.chat.id) in [13, 130]:
                 edition_post = get_chat_value_message(message)
 
                 con = sqlite3.connect(files.main_db)
@@ -340,6 +394,7 @@ async def in_moder_panel(bot, settings, message):
                     await bot.send_message(message.chat.id, 'Поста с таким описанием нет!\nВыберите заново!')
                 else:
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                    user_markup.row('Назад')
                     user_markup.row(main_menu)
                     await bot.send_message(message.chat.id, 'Введите новое описание поста',
                                            parse_mode='Markdown', reply_markup=user_markup)
@@ -351,7 +406,7 @@ async def in_moder_panel(bot, settings, message):
 
         elif message.text == 'Изменить дату':
             await bot.delete_message(message.chat.id, message.message_id)
-            if get_state(message.chat.id) == 13 or get_state(message.chat.id) == 130:
+            if get_state(message.chat.id) in [13, 130]:
                 edition_post = get_chat_value_message(message)
 
                 con = sqlite3.connect(files.main_db)
@@ -363,6 +418,7 @@ async def in_moder_panel(bot, settings, message):
                     await bot.send_message(message.chat.id, 'Поста с такой датой нет!\nВыберите заново!')
                 else:
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                    user_markup.row('Назад')
                     user_markup.row(main_menu)
                     await bot.send_message(message.chat.id, 'Введите новую дату поста',
                                            parse_mode='Markdown', reply_markup=user_markup)
@@ -374,7 +430,7 @@ async def in_moder_panel(bot, settings, message):
 
         elif message.text == 'Изменить требования':
             await bot.delete_message(message.chat.id, message.message_id)
-            if get_state(message.chat.id) == 13 or get_state(message.chat.id) == 130:
+            if get_state(message.chat.id) in [13, 130]:
                 edition_post = get_chat_value_message(message)
 
                 con = sqlite3.connect(files.main_db)
@@ -386,6 +442,7 @@ async def in_moder_panel(bot, settings, message):
                     await bot.send_message(message.chat.id, 'Поста с такими требованиями нет!\nВыберите заново!')
                 else:
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                    user_markup.row('Назад')
                     user_markup.row(main_menu)
                     await bot.send_message(message.chat.id, 'Введите что нужно сделать для участия',
                                            parse_mode='Markdown', reply_markup=user_markup)
@@ -471,6 +528,7 @@ async def in_moder_panel(bot, settings, message):
             await bot.delete_message(message.chat.id, message.message_id)
             if get_state(message.chat.id) in [13, 130]:
                 edition_post = get_chat_value_message(message)
+
                 con = sqlite3.connect(files.main_db)
                 cursor = con.cursor()
                 a = 0
@@ -495,6 +553,7 @@ async def in_moder_panel(bot, settings, message):
             await bot.delete_message(message.chat.id, message.message_id)
             if get_state(message.chat.id) in [13, 130]:
                 edition_post = get_chat_value_message(message)
+
                 con = sqlite3.connect(files.main_db)
                 cursor = con.cursor()
                 a = 0
@@ -549,7 +608,7 @@ async def in_moder_panel(bot, settings, message):
             user_markup.row(main_menu)
 
             authors = "Список авторов:\n\n"
-            if len(get_author_list()) != 0:
+            if len(get_admin_list()) != 0:
                 for author in get_author_list():
                     authors += f"{author[0]} - @{author[1]} - {author[2]} XP\n"
 
@@ -583,30 +642,179 @@ async def in_moder_panel(bot, settings, message):
 
         elif message.text == 'Список админов':
             await bot.delete_message(message.chat.id, message.message_id)
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            user_markup.row('Добавить нового админа', 'Удалить админа')
+            user_markup.row(main_menu)
+
             admins = "Список админов:\n\n"
             if len(get_admin_list()) != 0:
                 for admin in get_admin_list():
                     admins += f"{admin[0]} - @{admin[1]}\n"
 
-                await bot.send_message(message.chat.id, admins, parse_mode="HTML")
+                await bot.send_message(message.chat.id, admins, reply_markup=user_markup, parse_mode="HTML")
             else:
-                await bot.send_message(message.chat.id, "Админов еще нет")
+                await bot.send_message(message.chat.id, "Админов еще нет", reply_markup=user_markup)
+
+        elif message.text == 'Добавить нового админа':
+            await bot.delete_message(message.chat.id, message.message_id)
+            key = InlineKeyboardMarkup()
+            key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
+                                         callback_data='Вернуться в главное меню'))
+            await bot.send_message(message.chat.id, 'Перешлите любое сообщение от пользователя,'
+                                                    'которого хотите сделать админом', reply_markup=key)
+            set_state(message.chat.id, 41)
+
+        elif message.text == 'Удалить админа':
+            await bot.delete_message(message.chat.id, message.message_id)
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            a = 0
+            for admin in get_admin_list():
+                a += 1
+                if int(admin[0]) != admin_id: user_markup.row(f"{str(admin[0])} - {admin[1]}")
+            if a == 1:
+                await bot.send_message(message.chat.id, 'Вы ещё не добавляли админов!')
+            else:
+                user_markup.row(main_menu)
+                await bot.send_message(message.chat.id, 'Выбери админа, которого нужно удалить',
+                                       reply_markup=user_markup)
+                set_state(message.chat.id, 42)
 
         elif message.text == 'Список модераторов':
             await bot.delete_message(message.chat.id, message.message_id)
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            user_markup.row('Добавить нового модератора', 'Удалить модератора')
+            user_markup.row(main_menu)
+
             moders = "Список модераторов:\n\n"
             if len(get_moder_list()) != 0:
                 for moder in get_moder_list():
                     moders += f"{moder[0]} - @{moder[1]}\n"
-                await bot.send_message(message.chat.id, moders, parse_mode="HTML")
+                await bot.send_message(message.chat.id, moders, reply_markup=user_markup, parse_mode="HTML")
             else:
-                await bot.send_message(message.chat.id, "Модераторов еще нет")
+                await bot.send_message(message.chat.id, "Модераторов еще нет", reply_markup=user_markup)
+
+        elif message.text == 'Добавить нового модератора':
+            await bot.delete_message(message.chat.id, message.message_id)
+            key = InlineKeyboardMarkup()
+            key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
+                                         callback_data='Вернуться в главное меню'))
+            await bot.send_message(message.chat.id, 'Перешлите сообщение пользователя в бота, '
+                                                    'чтобы сделать его модератором.', reply_markup=key)
+            set_state(message.chat.id, 51)
+
+        elif message.text == 'Удалить модератора':
+            await bot.delete_message(message.chat.id, message.message_id)
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            a = 0
+            for moder in get_moder_list():
+                a += 1
+                user_markup.row(f'{str(moder[0])} - {moder[1]}')
+            if a == 0:
+                await bot.send_message(message.chat.id, 'Вы ещё не добавляли модераторов!')
+            else:
+                user_markup.row(main_menu)
+                await bot.send_message(message.chat.id, 'Выбери id модератора, которого нужно удалить',
+                                       reply_markup=user_markup)
+                set_state(message.chat.id, 52)
 
         elif message.text == 'Скачать лог файл':
             await bot.delete_message(message.chat.id, message.message_id)
             working_log = open(files.working_log, 'rb')
             await bot.send_document(message.chat.id, working_log)
             working_log.close()
+            system_log = open(files.system_log, 'rb')
+            await bot.send_document(message.chat.id, system_log)
+            system_log.close()
+
+        elif message.text == 'Настройки бота':
+            await bot.delete_message(message.chat.id, message.message_id)
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+
+            user_markup.row(f'Часовой пояс: {settings.time_zone}')
+            user_markup.row(f'Название канала: {settings.channel_name}')
+            user_markup.row(f'Порог опыта авторам: {settings.threshold_xp}')
+            user_markup.row('Изменить выводное сообщение команды /help')
+            user_markup.row('Изменить нижнюю подпись для постов')
+            user_markup.row('Скачать лог файл')
+            user_markup.row(main_menu)
+
+            await bot.send_message(message.chat.id, "Вы вошли в настройки бота", reply_markup=user_markup,
+                                   parse_mode="HTML")
+
+        elif message.text == 'Изменить выводное сообщение команды /help':
+            await bot.delete_message(message.chat.id, message.message_id)
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            user_markup.row(main_menu)
+            help_entities = []
+
+            help_text = settings.help_text
+            raw_entities = json.loads(str(settings.help_text_entities))
+
+            if "entities" in raw_entities:
+
+                for entity in raw_entities["entities"]:
+                    entity_values_list = list(entity.values())
+
+                    if entity["type"] == "text_link":
+                        entity = MessageEntity(type=entity_values_list[0],
+                                               offset=entity_values_list[1],
+                                               length=entity_values_list[2], url=entity_values_list[3])
+                        help_entities.append(entity)
+                    elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                            "email", "phone_number", "bold", "italic", "underline",
+                                            "strikethrough", "code"]:
+                        entity = MessageEntity(type=entity_values_list[0],
+                                               offset=entity_values_list[1],
+                                               length=entity_values_list[2])
+                        help_entities.append(entity)
+
+            await bot.send_message(message.chat.id, "На данный момент сообщение help такое:")
+            await bot.send_message(message.chat.id, help_text, entities=help_entities, reply_markup=user_markup)
+            await bot.send_message(message.chat.id, "Введите новое сообщение для команды help:")
+
+            set_state(message.chat.id, 61)
+
+        elif message.text == 'Изменить нижнюю подпись для постов':
+            await bot.delete_message(message.chat.id, message.message_id)
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            user_markup.row(main_menu)
+            footer_entities = []
+
+            footer_text = settings.footer_text
+            raw_entities = json.loads(str(settings.footer_text_entities))
+
+            if "entities" in raw_entities:
+
+                for entity in raw_entities["entities"]:
+                    entity_values_list = list(entity.values())
+
+                    if entity["type"] == "text_link":
+                        entity = MessageEntity(type=entity_values_list[0],
+                                               offset=entity_values_list[1],
+                                               length=entity_values_list[2], url=entity_values_list[3])
+                        footer_entities.append(entity)
+                    elif entity["type"] in ["mention", "url", "hashtag", "cashtag", "bot_command",
+                                            "email", "phone_number", "bold", "italic", "underline",
+                                            "strikethrough", "code"]:
+                        entity = MessageEntity(type=entity_values_list[0],
+                                               offset=entity_values_list[1],
+                                               length=entity_values_list[2])
+                        footer_entities.append(entity)
+
+            await bot.send_message(message.chat.id, "На данный момент footer такой:")
+            await bot.send_message(message.chat.id, footer_text, entities=footer_entities, reply_markup=user_markup)
+            await bot.send_message(message.chat.id, "Введите новый footer:")
+
+            set_state(message.chat.id, 62)
+
+        elif isinstance(message.text, str) and 'Порог опыта авторам:' in message.text:
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+
+            user_markup.row(main_menu)
+
+            await bot.send_message(message.chat.id, "Введите новый порог для авторов"
+                                                    " (только число)", reply_markup=user_markup)
+            set_state(message.chat.id, 63)
 
         elif get_state(message.chat.id) == 1:
             set_chat_value_message(message, 1)
@@ -677,35 +885,46 @@ async def in_moder_panel(bot, settings, message):
                                              callback_data='Вернуться в главное меню'))
                 await bot.send_message(message.chat.id, 'Есть ли сайт у проекта?', reply_markup=key)
             elif get_state(message.chat.id) == 5:
-                set_chat_value_message(message, 5)
+                if validators.url(message.text):
+                    set_chat_value_message(message, 5)
 
-                key.row(InlineKeyboardButton(text='ДА', callback_data='Есть твиттер'),
-                        InlineKeyboardButton(text='НЕТ', callback_data='Нет твиттера'))
-                key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
-                                             callback_data='Вернуться в главное меню'))
-                await bot.send_message(message.chat.id, 'Есть ли твиттер у проекта?', reply_markup=key)
+                    key.row(InlineKeyboardButton(text='ДА', callback_data='Есть твиттер'),
+                            InlineKeyboardButton(text='НЕТ', callback_data='Нет твиттера'))
+                    key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
+                                                 callback_data='Вернуться в главное меню'))
+                    await bot.send_message(message.chat.id, 'Есть ли твиттер у проекта?', reply_markup=key)
+                else:
+                    await bot.send_message(message.chat.id, 'Введите ссылку формата http://example.com')
             elif get_state(message.chat.id) == 6:
-                set_chat_value_message(message, 6)
+                if validators.url(message.text):
+                    set_chat_value_message(message, 6)
 
-                key.row(InlineKeyboardButton(text='ДА', callback_data='Есть дискорд'),
-                        InlineKeyboardButton(text='НЕТ', callback_data='Нет дискорда'))
-                key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
-                                             callback_data='Вернуться в главное меню'))
-                await bot.send_message(message.chat.id, 'Есть ли дискорд у проекта?', reply_markup=key)
+                    key.row(InlineKeyboardButton(text='ДА', callback_data='Есть дискорд'),
+                            InlineKeyboardButton(text='НЕТ', callback_data='Нет дискорда'))
+                    key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
+                                                 callback_data='Вернуться в главное меню'))
+                    await bot.send_message(message.chat.id, 'Есть ли дискорд у проекта?', reply_markup=key)
+                else:
+                    await bot.send_message(message.chat.id, 'Введите ссылку формата http://example.com')
 
         elif get_state(message.chat.id) == 7:
-            set_chat_value_message(message, 7)
-            key = InlineKeyboardMarkup()
-            key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
-                                         callback_data='Вернуться в главное меню'))
-            await bot.send_message(message.chat.id, 'Важное напоминание!!! '
-                                                    'Определитесь, будет ли в нём картинка.'
-                                                    'Если вы не добавите картинку сразу, '
-                                                    'то потом вы её не сможете уже добавить, и если картинка уже была,'
-                                                    'то вы не сможете её убрать!')
-            await bot.send_message(message.chat.id, 'Вставьте баннер (изображение) поста. '
-                                                    'Или если нет баннера, то пропишите /empty', reply_markup=key)
-            set_state(message.chat.id, 8)
+            if validators.url(message.text):
+                set_chat_value_message(message, 7)
+
+                key = InlineKeyboardMarkup()
+                key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
+                                             callback_data='Вернуться в главное меню'))
+                await bot.send_message(message.chat.id, 'Важное напоминание!!! '
+                                                        'Определитесь, будет ли в нём картинка.'
+                                                        'Если вы не добавите картинку сразу, '
+                                                        'то потом вы её не сможете уже добавить, и если картинка уже была,'
+                                                        'то вы не сможете её убрать!')
+                await bot.send_message(message.chat.id, 'Вставьте баннер (изображение) поста. '
+                                                        'Или если нет баннера, то пропишите /empty', reply_markup=key)
+
+                set_state(message.chat.id, 8)
+            else:
+                await bot.send_message(message.chat.id, 'Введите ссылку формата http://example.com')
 
         elif get_state(message.chat.id) == 8:
             if message.text == '/empty':
@@ -713,25 +932,33 @@ async def in_moder_panel(bot, settings, message):
             elif message.document:
                 file_info = await bot.get_file(message.document.file_id)
                 downloaded_file = await bot.download_file(file_info.file_path)
+
                 creation_post = get_chat_value_message(message)
+
                 src = f"data/media/posts_media/pic for post - {creation_post['post_name']}.jpeg"
                 with open(src, 'wb') as new_file:
                     new_file.write(downloaded_file.getvalue())
                 set_chat_value_message(message, 8, pic_src=src)
+
                 await bot.send_message(message.chat.id, 'Изображение загружено.')
             elif message.photo:
                 file_info = await bot.get_file(message.photo[-1].file_id)
                 downloaded_file = await bot.download_file(file_info.file_path)
+
                 creation_post = get_chat_value_message(message)
+
                 src = f"data/media/posts_media/pic for post - {creation_post['post_name']}.jpeg"
                 with open(src, 'wb') as new_file:
                     new_file.write(downloaded_file.getvalue())
                 set_chat_value_message(message, 8, pic_src=src)
+
                 await bot.send_message(message.chat.id, 'Изображение загружено.')
+
             key = InlineKeyboardMarkup()
             key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
                                          callback_data='Вернуться в главное меню'))
             await bot.send_message(message.chat.id, 'Введите хэштеги поста', reply_markup=key)
+
             set_state(message.chat.id, 9)
 
         elif get_state(message.chat.id) == 9:
@@ -1004,6 +1231,7 @@ async def in_moder_panel(bot, settings, message):
                 user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                 user_markup.row('Посты')
                 user_markup.row('Списки')
+                user_markup.row('Настройки бота')
 
                 await bot.send_message(message.chat.id, 'Пост был создан и размещен на канале.',
                                        reply_markup=user_markup)
@@ -1023,6 +1251,7 @@ async def in_moder_panel(bot, settings, message):
                 user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                 user_markup.row('Посты')
                 user_markup.row('Списки')
+                user_markup.row('Настройки бота')
 
                 await bot.send_message(message.chat.id, "Вы не написали 'Да', поэтому Пост не был размещён.",
                                        reply_markup=user_markup)
@@ -1034,27 +1263,30 @@ async def in_moder_panel(bot, settings, message):
             con = sqlite3.connect(files.main_db)
             cursor = con.cursor()
             a = 0
-            cursor.execute(f"SELECT author_name, post_name, post_date, post_desc, what_needs, hashtags, "
-                           f"pic_post, name_entities, desc_entities, date_entities, what_needs_entities, "
-                           f"status FROM posts WHERE post_name = '{message.text}';")
-            for author_name, post_name, post_date, post_desc, what_needs, hashtags, \
+            cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                           "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                           f"what_needs_entities, status FROM posts WHERE post_name = '{message.text}';")
+            for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
                 pic_post, name_entities, desc_entities, date_entities, \
                 what_needs_entities, status in cursor.fetchall():
                 a += 1
 
                 with shelve.open(files.bot_message_bd) as bd:
                     bd[str(message.chat.id)] = {
-                        'author_name': author_name,
-                        'post_name': post_name,
-                        'post_desc': post_desc,
-                        'post_date': post_date,
-                        'what_needs': what_needs,
-                        'hashtags': hashtags,
-                        'pic_post': pic_post,
-                        'name_entities': name_entities,
-                        'desc_entities': desc_entities,
-                        'date_entities': date_entities,
-                        'what_needs_entities': what_needs_entities,
+                        'author_name': str(author_name),
+                        'post_name': str(post_name),
+                        'post_desc': str(post_desc),
+                        'post_date': str(post_date),
+                        'what_needs': str(what_needs),
+                        'site': str(site),
+                        'twitter': str(twitter),
+                        'discord': str(discord),
+                        'hashtags': str(hashtags),
+                        'pic_post': str(pic_post),
+                        'name_entities': str(name_entities),
+                        'desc_entities': str(desc_entities),
+                        'date_entities': str(date_entities),
+                        'what_needs_entities': str(what_needs_entities),
                         'status': status
                     }
 
@@ -1067,6 +1299,8 @@ async def in_moder_panel(bot, settings, message):
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                     user_markup.row('Изменить тему', 'Изменить описание')
                     user_markup.row('Изменить дату', 'Изменить требования')
+                    user_markup.row('Изменить сайт проекта')
+                    user_markup.row('Изменить твиттер', 'Изменить дискорд')
                     user_markup.row('Изменить баннер', 'Изменить хэштеги')
                     user_markup.row(main_menu)
                     await bot.send_message(message.chat.id, 'Теперь выберите, что хотите изменить',
@@ -1114,10 +1348,10 @@ async def in_moder_panel(bot, settings, message):
             con = sqlite3.connect(files.main_db)
             cursor = con.cursor()
             a = 0
-            cursor.execute(f"SELECT author_name, post_name, post_date, post_desc, what_needs, hashtags, "
-                           f"pic_post, name_entities, desc_entities, date_entities, what_needs_entities, "
-                           f"status FROM posts WHERE post_name = '{message.text}';")
-            for author_name, post_name, post_date, post_desc, what_needs, hashtags, \
+            cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                           "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                           f"what_needs_entities, status FROM posts WHERE post_name = '{message.text}';")
+            for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
                 pic_post, name_entities, desc_entities, date_entities, \
                 what_needs_entities, status in cursor.fetchall():
                 a += 1
@@ -1126,16 +1360,19 @@ async def in_moder_panel(bot, settings, message):
                     bd[str(message.chat.id)] = {
                         'author_name': str(author_name),
                         'post_name': str(post_name),
-                        'name_entities': str(name_entities),
-                        'post_date': str(post_date),
-                        'date_entities': str(date_entities),
                         'post_desc': str(post_desc),
-                        'desc_entities': str(desc_entities),
+                        'post_date': str(post_date),
                         'what_needs': str(what_needs),
-                        'what_needs_entities': str(what_needs_entities),
+                        'site': str(site),
+                        'twitter': str(twitter),
+                        'discord': str(discord),
                         'hashtags': str(hashtags),
                         'pic_post': str(pic_post),
-                        'status': status,
+                        'name_entities': str(name_entities),
+                        'desc_entities': str(desc_entities),
+                        'date_entities': str(date_entities),
+                        'what_needs_entities': str(what_needs_entities),
+                        'status': status
                     }
 
             edition_post = get_chat_value_message(message)
@@ -1143,36 +1380,13 @@ async def in_moder_panel(bot, settings, message):
             if a == 0:
                 await bot.send_message(message.chat.id, 'Поста с таким названием нет!\nВыберите заново!')
             else:
-                text = f"{edition_post['post_name']}\n\n" \
-                       f"{edition_post['post_desc']}\n\n" \
-                       f"✅ {edition_post['what_needs']}\n\n" \
-                       f"📆 {edition_post['post_date']}\n\n" \
-                       f"{edition_post['hashtags']}\n\n" \
-                       f"Автор: @{edition_post['author_name']}\n" \
-                       f"{settings.footer_text}"
-
-                if type(edition_post['pic_post']) is tuple:
-                    if edition_post['pic_post'][0] == '':
-                        text_format_char = 4096
-                    else:
-                        text_format_char = 1024
-                else:
-                    if edition_post['pic_post'] == '':
-                        text_format_char = 4096
-                    else:
-                        text_format_char = 1024
-
-                try:
-                    await preview(bot, message, edition_post, settings)
-                except Exception as e:
-                    if str(e) == 'Media_caption_too_long':
-                        await bot.send_message(message.chat.id, 'Пост слишком большой, нужно его сократить.\n'
-                                                                f'Сейчас количество символов: {len(text)}.\n'
-                                                                f'Должно быть: {text_format_char}')
+                await preview(bot, message, edition_post, settings)
 
                 user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                 user_markup.row('Изменить тему', 'Изменить описание')
                 user_markup.row('Изменить дату', 'Изменить требования')
+                user_markup.row('Изменить сайт проекта')
+                user_markup.row('Изменить твиттер', 'Изменить дискорд')
                 user_markup.row('Изменить баннер', 'Изменить хэштеги')
                 user_markup.row(main_menu)
                 await bot.send_message(message.chat.id, 'Теперь выберите, что хотите изменить',
@@ -1190,26 +1404,29 @@ async def in_moder_panel(bot, settings, message):
             con.commit()
 
             if get_state(message.chat.id) == 14:
-                cursor.execute(f"SELECT author_name, post_name, post_date, post_desc, what_needs, hashtags, "
-                               f"pic_post, name_entities, desc_entities, date_entities, what_needs_entities, "
-                               f"status, message_id FROM posts WHERE post_name = '{message.text}';")
-
-                for author_name, post_name, post_date, post_desc, what_needs, hashtags, \
+                cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                               "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                               "what_needs_entities, status, message_id "
+                               f"FROM posts WHERE post_name = '{message.text}';")
+                for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
                     pic_post, name_entities, desc_entities, date_entities, \
                     what_needs_entities, status, message_id in cursor.fetchall():
                     with shelve.open(files.bot_message_bd) as bd:
                         bd[str(message.chat.id)] = {
                             'author_name': str(author_name),
                             'post_name': str(post_name),
-                            'name_entities': str(name_entities),
-                            'post_date': str(post_date),
-                            'date_entities': str(date_entities),
                             'post_desc': str(post_desc),
-                            'desc_entities': str(desc_entities),
+                            'post_date': str(post_date),
                             'what_needs': str(what_needs),
-                            'what_needs_entities': str(what_needs_entities),
+                            'site': str(site),
+                            'twitter': str(twitter),
+                            'discord': str(discord),
                             'hashtags': str(hashtags),
                             'pic_post': str(pic_post),
+                            'name_entities': str(name_entities),
+                            'desc_entities': str(desc_entities),
+                            'date_entities': str(date_entities),
+                            'what_needs_entities': str(what_needs_entities),
                             'status': status,
                             'message_id': message_id
                         }
@@ -1224,6 +1441,8 @@ async def in_moder_panel(bot, settings, message):
                 user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                 user_markup.row('Изменить тему', 'Изменить описание')
                 user_markup.row('Изменить дату', 'Изменить требования')
+                user_markup.row('Изменить сайт проекта')
+                user_markup.row('Изменить твиттер', 'Изменить дискорд')
                 user_markup.row('Изменить баннер', 'Изменить хэштеги')
                 user_markup.row(main_menu)
                 await bot.send_message(message.chat.id, 'Тема поста успешно изменена!', reply_markup=user_markup)
@@ -1231,40 +1450,54 @@ async def in_moder_panel(bot, settings, message):
                 set_state(message.chat.id, 13)
 
             elif get_state(message.chat.id) == 140:
-                cursor.execute(f"SELECT author_name, post_name, post_date, post_desc, what_needs, hashtags, "
-                               f"pic_post, name_entities, desc_entities, date_entities, what_needs_entities, "
-                               f"status, message_id FROM posts WHERE post_name = '{message.text}';")
-
-                for author_name, post_name, post_date, post_desc, what_needs, hashtags, \
+                cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                               "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                               "what_needs_entities, status, message_id "
+                               f"FROM posts WHERE post_name = '{message.text}';")
+                for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
                     pic_post, name_entities, desc_entities, date_entities, \
                     what_needs_entities, status, message_id in cursor.fetchall():
                     with shelve.open(files.bot_message_bd) as bd:
                         bd[str(message.chat.id)] = {
                             'author_name': str(author_name),
                             'post_name': str(post_name),
-                            'name_entities': str(name_entities),
-                            'post_date': str(post_date),
-                            'date_entities': str(date_entities),
                             'post_desc': str(post_desc),
-                            'desc_entities': str(desc_entities),
+                            'post_date': str(post_date),
                             'what_needs': str(what_needs),
-                            'what_needs_entities': str(what_needs_entities),
+                            'site': str(site),
+                            'twitter': str(twitter),
+                            'discord': str(discord),
                             'hashtags': str(hashtags),
                             'pic_post': str(pic_post),
+                            'name_entities': str(name_entities),
+                            'desc_entities': str(desc_entities),
+                            'date_entities': str(date_entities),
+                            'what_needs_entities': str(what_needs_entities),
                             'status': status,
                             'message_id': message_id
                         }
 
                 edition_post = get_chat_value_message(message)
 
-                await preview(bot, message, edition_post, settings)
+                if await preview(bot, message, edition_post, settings):
+                    key = InlineKeyboardMarkup()
+                    key.row(InlineKeyboardButton(text='ДА', callback_data='Редактировать пост'),
+                            InlineKeyboardButton(text='НЕТ', callback_data='Подтвердить пост'))
+                    key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
+                                                 callback_data='Вернуться в главное меню'))
+                    await bot.send_message(message.chat.id, 'Хотите ли редактировать пост?', reply_markup=key)
+                else:
+                    user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                    user_markup.row('Изменить тему', 'Изменить описание')
+                    user_markup.row('Изменить дату', 'Изменить требования')
+                    user_markup.row('Изменить сайт проекта')
+                    user_markup.row('Изменить твиттер', 'Изменить дискорд')
+                    user_markup.row('Изменить баннер', 'Изменить хэштеги')
+                    user_markup.row(main_menu)
+                    await bot.send_message(message.chat.id, 'Теперь выберите, что хотите изменить',
+                                           reply_markup=user_markup)
+                    set_state(message.chat.id, 130)
 
-                key = InlineKeyboardMarkup()
-                key.row(InlineKeyboardButton(text='ДА', callback_data='Редактировать пост'),
-                        InlineKeyboardButton(text='НЕТ', callback_data='Подтвердить пост'))
-                key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
-                                             callback_data='Вернуться в главное меню'))
-                await bot.send_message(message.chat.id, 'Хотите ли редактировать пост?', reply_markup=key)
             con.close()
 
         elif get_state(message.chat.id) in [15, 150]:
@@ -1277,27 +1510,30 @@ async def in_moder_panel(bot, settings, message):
             con.commit()
 
             if get_state(message.chat.id) == 15:
-                cursor.execute(f"SELECT author_name, post_name, post_date, post_desc, what_needs, hashtags, "
-                               f"pic_post, name_entities, desc_entities, date_entities, what_needs_entities, "
-                               f"status, message_id FROM posts "
-                               f"WHERE post_name = '{str(edition_post['post_name'])}';")
+                cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                               "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                               "what_needs_entities, status, message_id "
+                               f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
 
-                for author_name, post_name, post_date, post_desc, what_needs, hashtags, \
+                for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
                     pic_post, name_entities, desc_entities, date_entities, \
                     what_needs_entities, status, message_id in cursor.fetchall():
                     with shelve.open(files.bot_message_bd) as bd:
                         bd[str(message.chat.id)] = {
                             'author_name': str(author_name),
                             'post_name': str(post_name),
-                            'name_entities': str(name_entities),
-                            'post_date': str(post_date),
-                            'date_entities': str(date_entities),
                             'post_desc': str(post_desc),
-                            'desc_entities': str(desc_entities),
+                            'post_date': str(post_date),
                             'what_needs': str(what_needs),
-                            'what_needs_entities': str(what_needs_entities),
+                            'site': str(site),
+                            'twitter': str(twitter),
+                            'discord': str(discord),
                             'hashtags': str(hashtags),
                             'pic_post': str(pic_post),
+                            'name_entities': str(name_entities),
+                            'desc_entities': str(desc_entities),
+                            'date_entities': str(date_entities),
+                            'what_needs_entities': str(what_needs_entities),
                             'status': status,
                             'message_id': message_id
                         }
@@ -1312,46 +1548,62 @@ async def in_moder_panel(bot, settings, message):
                 user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                 user_markup.row('Изменить тему', 'Изменить описание')
                 user_markup.row('Изменить дату', 'Изменить требования')
+                user_markup.row('Изменить сайт проекта')
+                user_markup.row('Изменить твиттер', 'Изменить дискорд')
                 user_markup.row('Изменить баннер', 'Изменить хэштеги')
                 user_markup.row(main_menu)
                 await bot.send_message(message.chat.id, 'Описание поста успешно изменено!', reply_markup=user_markup)
                 await log(f"Description post {edition_post['post_name']} is changed by {message.chat.id}")
                 set_state(message.chat.id, 13)
             elif get_state(message.chat.id) == 150:
-                cursor.execute(f"SELECT author_name, post_name, post_date, post_desc, what_needs, hashtags, "
-                               f"pic_post, name_entities, desc_entities, date_entities, what_needs_entities, "
-                               f"status, message_id FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
+                cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                               "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                               "what_needs_entities, status, message_id "
+                               f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
 
-                for author_name, post_name, post_date, post_desc, what_needs, hashtags, \
+                for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
                     pic_post, name_entities, desc_entities, date_entities, \
                     what_needs_entities, status, message_id in cursor.fetchall():
                     with shelve.open(files.bot_message_bd) as bd:
                         bd[str(message.chat.id)] = {
                             'author_name': str(author_name),
                             'post_name': str(post_name),
-                            'name_entities': str(name_entities),
-                            'post_date': str(post_date),
-                            'date_entities': str(date_entities),
                             'post_desc': str(post_desc),
-                            'desc_entities': str(desc_entities),
+                            'post_date': str(post_date),
                             'what_needs': str(what_needs),
-                            'what_needs_entities': str(what_needs_entities),
+                            'site': str(site),
+                            'twitter': str(twitter),
+                            'discord': str(discord),
                             'hashtags': str(hashtags),
                             'pic_post': str(pic_post),
+                            'name_entities': str(name_entities),
+                            'desc_entities': str(desc_entities),
+                            'date_entities': str(date_entities),
+                            'what_needs_entities': str(what_needs_entities),
                             'status': status,
                             'message_id': message_id
                         }
 
                 edition_post = get_chat_value_message(message)
 
-                await preview(bot, message, edition_post, settings)
-
-                key = InlineKeyboardMarkup()
-                key.row(InlineKeyboardButton(text='ДА', callback_data='Редактировать пост'),
-                        InlineKeyboardButton(text='НЕТ', callback_data='Подтвердить пост'))
-                key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
-                                             callback_data='Вернуться в главное меню'))
-                await bot.send_message(message.chat.id, 'Хотите ли редактировать пост?', reply_markup=key)
+                if await preview(bot, message, edition_post, settings):
+                    key = InlineKeyboardMarkup()
+                    key.row(InlineKeyboardButton(text='ДА', callback_data='Редактировать пост'),
+                            InlineKeyboardButton(text='НЕТ', callback_data='Подтвердить пост'))
+                    key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
+                                                 callback_data='Вернуться в главное меню'))
+                    await bot.send_message(message.chat.id, 'Хотите ли редактировать пост?', reply_markup=key)
+                else:
+                    user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                    user_markup.row('Изменить тему', 'Изменить описание')
+                    user_markup.row('Изменить дату', 'Изменить требования')
+                    user_markup.row('Изменить сайт проекта')
+                    user_markup.row('Изменить твиттер', 'Изменить дискорд')
+                    user_markup.row('Изменить баннер', 'Изменить хэштеги')
+                    user_markup.row(main_menu)
+                    await bot.send_message(message.chat.id, 'Теперь выберите, что хотите изменить',
+                                           reply_markup=user_markup)
+                    set_state(message.chat.id, 130)
             con.close()
 
         elif get_state(message.chat.id) in [16, 160]:
@@ -1585,102 +1837,61 @@ async def in_moder_panel(bot, settings, message):
         elif get_state(message.chat.id) in [18, 180]:
             edition_post = get_chat_value_message(message)
 
+            site = ''
+
             if message.text == '/empty':
-                site = ''
+                flag_site = 1
             else:
-                site = message.text
-
-            con = sqlite3.connect(files.main_db)
-            cursor = con.cursor()
-            cursor.execute(f"UPDATE posts SET site = '{site}' "
-                           f"WHERE post_name = '{str(edition_post['post_name'])}';")
-            con.commit()
-
-            if get_state(message.chat.id) == 18:
-                cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
-                               "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
-                               "what_needs_entities, status, message_id "
-                               f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
-
-                for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
-                    pic_post, name_entities, desc_entities, date_entities, \
-                    what_needs_entities, status, message_id in cursor.fetchall():
-                    with shelve.open(files.bot_message_bd) as bd:
-                        bd[str(message.chat.id)] = {
-                            'author_name': str(author_name),
-                            'post_name': str(post_name),
-                            'post_desc': str(post_desc),
-                            'post_date': str(post_date),
-                            'what_needs': str(what_needs),
-                            'site': str(site),
-                            'twitter': str(twitter),
-                            'discord': str(discord),
-                            'hashtags': str(hashtags),
-                            'pic_post': str(pic_post),
-                            'name_entities': str(name_entities),
-                            'desc_entities': str(desc_entities),
-                            'date_entities': str(date_entities),
-                            'what_needs_entities': str(what_needs_entities),
-                            'status': status,
-                            'message_id': message_id
-                        }
-
-                edition_post = get_chat_value_message(message)
-
-                if edition_post['status']:
-                    await edit_post(bot, message, edition_post, settings, 0)
+                if validators.url(message.text):
+                    site = message.text
+                    flag_site = 1
                 else:
-                    pass
+                    await bot.send_message(message.chat.id, 'Введите ссылку формата http://example.com')
+                    flag_site = 0
 
-                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
-                user_markup.row('Изменить тему', 'Изменить описание')
-                user_markup.row('Изменить дату', 'Изменить требования')
-                user_markup.row('Изменить сайт проекта')
-                user_markup.row('Изменить твиттер', 'Изменить дискорд')
-                user_markup.row('Изменить баннер', 'Изменить хэштеги')
-                user_markup.row(main_menu)
-                await bot.send_message(message.chat.id, 'Сайт проекта успешно изменен!', reply_markup=user_markup)
-                await log(f"Requirements {edition_post['post_name']} is changed by {message.chat.id}")
-                set_state(message.chat.id, 13)
-            elif get_state(message.chat.id) == 180:
-                cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
-                               "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
-                               "what_needs_entities, status, message_id "
-                               f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
+            if flag_site:
+                con = sqlite3.connect(files.main_db)
+                cursor = con.cursor()
+                cursor.execute(f"UPDATE posts SET site = '{site}' "
+                               f"WHERE post_name = '{str(edition_post['post_name'])}';")
+                con.commit()
 
-                for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
-                    pic_post, name_entities, desc_entities, date_entities, \
-                    what_needs_entities, status, message_id in cursor.fetchall():
-                    with shelve.open(files.bot_message_bd) as bd:
-                        bd[str(message.chat.id)] = {
-                            'author_name': str(author_name),
-                            'post_name': str(post_name),
-                            'post_desc': str(post_desc),
-                            'post_date': str(post_date),
-                            'what_needs': str(what_needs),
-                            'site': str(site),
-                            'twitter': str(twitter),
-                            'discord': str(discord),
-                            'hashtags': str(hashtags),
-                            'pic_post': str(pic_post),
-                            'name_entities': str(name_entities),
-                            'desc_entities': str(desc_entities),
-                            'date_entities': str(date_entities),
-                            'what_needs_entities': str(what_needs_entities),
-                            'status': status,
-                            'message_id': message_id
-                        }
+                if get_state(message.chat.id) == 18:
+                    cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                                   "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                                   "what_needs_entities, status, message_id "
+                                   f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
 
-                edition_post = get_chat_value_message(message)
+                    for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
+                        pic_post, name_entities, desc_entities, date_entities, \
+                        what_needs_entities, status, message_id in cursor.fetchall():
+                        with shelve.open(files.bot_message_bd) as bd:
+                            bd[str(message.chat.id)] = {
+                                'author_name': str(author_name),
+                                'post_name': str(post_name),
+                                'post_desc': str(post_desc),
+                                'post_date': str(post_date),
+                                'what_needs': str(what_needs),
+                                'site': str(site),
+                                'twitter': str(twitter),
+                                'discord': str(discord),
+                                'hashtags': str(hashtags),
+                                'pic_post': str(pic_post),
+                                'name_entities': str(name_entities),
+                                'desc_entities': str(desc_entities),
+                                'date_entities': str(date_entities),
+                                'what_needs_entities': str(what_needs_entities),
+                                'status': status,
+                                'message_id': message_id
+                            }
 
-                if await preview(bot, message, edition_post, settings):
-                    key = InlineKeyboardMarkup()
-                    key.row(InlineKeyboardButton(text='ДА', callback_data='Редактировать пост'),
-                            InlineKeyboardButton(text='НЕТ', callback_data='Подтвердить пост'))
-                    key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
-                                                 callback_data='Вернуться в главное меню'))
-                    await bot.send_message(message.chat.id, 'Хотите ли редактировать пост?', reply_markup=key)
-                else:
+                    edition_post = get_chat_value_message(message)
+
+                    if edition_post['status']:
+                        await edit_post(bot, message, edition_post, settings, 0)
+                    else:
+                        pass
+
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                     user_markup.row('Изменить тему', 'Изменить описание')
                     user_markup.row('Изменить дату', 'Изменить требования')
@@ -1688,110 +1899,118 @@ async def in_moder_panel(bot, settings, message):
                     user_markup.row('Изменить твиттер', 'Изменить дискорд')
                     user_markup.row('Изменить баннер', 'Изменить хэштеги')
                     user_markup.row(main_menu)
-                    await bot.send_message(message.chat.id, 'Теперь выберите, что хотите изменить',
-                                           reply_markup=user_markup)
-                    set_state(message.chat.id, 130)
-            con.close()
+                    await bot.send_message(message.chat.id, 'Сайт проекта успешно изменен!', reply_markup=user_markup)
+                    await log(f"Requirements {edition_post['post_name']} is changed by {message.chat.id}")
+                    set_state(message.chat.id, 13)
+                elif get_state(message.chat.id) == 180:
+                    cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                                   "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                                   "what_needs_entities, status, message_id "
+                                   f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
+
+                    for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
+                        pic_post, name_entities, desc_entities, date_entities, \
+                        what_needs_entities, status, message_id in cursor.fetchall():
+                        with shelve.open(files.bot_message_bd) as bd:
+                            bd[str(message.chat.id)] = {
+                                'author_name': str(author_name),
+                                'post_name': str(post_name),
+                                'post_desc': str(post_desc),
+                                'post_date': str(post_date),
+                                'what_needs': str(what_needs),
+                                'site': str(site),
+                                'twitter': str(twitter),
+                                'discord': str(discord),
+                                'hashtags': str(hashtags),
+                                'pic_post': str(pic_post),
+                                'name_entities': str(name_entities),
+                                'desc_entities': str(desc_entities),
+                                'date_entities': str(date_entities),
+                                'what_needs_entities': str(what_needs_entities),
+                                'status': status,
+                                'message_id': message_id
+                            }
+
+                    edition_post = get_chat_value_message(message)
+
+                    if await preview(bot, message, edition_post, settings):
+                        key = InlineKeyboardMarkup()
+                        key.row(InlineKeyboardButton(text='ДА', callback_data='Редактировать пост'),
+                                InlineKeyboardButton(text='НЕТ', callback_data='Подтвердить пост'))
+                        key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
+                                                     callback_data='Вернуться в главное меню'))
+                        await bot.send_message(message.chat.id, 'Хотите ли редактировать пост?', reply_markup=key)
+                    else:
+                        user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                        user_markup.row('Изменить тему', 'Изменить описание')
+                        user_markup.row('Изменить дату', 'Изменить требования')
+                        user_markup.row('Изменить сайт проекта')
+                        user_markup.row('Изменить твиттер', 'Изменить дискорд')
+                        user_markup.row('Изменить баннер', 'Изменить хэштеги')
+                        user_markup.row(main_menu)
+                        await bot.send_message(message.chat.id, 'Теперь выберите, что хотите изменить',
+                                               reply_markup=user_markup)
+                        set_state(message.chat.id, 130)
+                con.close()
 
         elif get_state(message.chat.id) in [19, 190]:
             edition_post = get_chat_value_message(message)
 
+            twitter = ''
+
             if message.text == '/empty':
-                twitter = ''
+                flag_site = 1
             else:
-                twitter = message.text
-
-            con = sqlite3.connect(files.main_db)
-            cursor = con.cursor()
-            cursor.execute(f"UPDATE posts SET twitter = '{twitter}' "
-                           f"WHERE post_name = '{str(edition_post['post_name'])}';")
-            con.commit()
-
-            if get_state(message.chat.id) == 19:
-                cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
-                               "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
-                               "what_needs_entities, status, message_id "
-                               f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
-
-                for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
-                    pic_post, name_entities, desc_entities, date_entities, \
-                    what_needs_entities, status, message_id in cursor.fetchall():
-                    with shelve.open(files.bot_message_bd) as bd:
-                        bd[str(message.chat.id)] = {
-                            'author_name': str(author_name),
-                            'post_name': str(post_name),
-                            'post_desc': str(post_desc),
-                            'post_date': str(post_date),
-                            'what_needs': str(what_needs),
-                            'site': str(site),
-                            'twitter': str(twitter),
-                            'discord': str(discord),
-                            'hashtags': str(hashtags),
-                            'pic_post': str(pic_post),
-                            'name_entities': str(name_entities),
-                            'desc_entities': str(desc_entities),
-                            'date_entities': str(date_entities),
-                            'what_needs_entities': str(what_needs_entities),
-                            'status': status,
-                            'message_id': message_id
-                        }
-
-                edition_post = get_chat_value_message(message)
-
-                if edition_post['status']:
-                    await edit_post(bot, message, edition_post, settings, 0)
+                if validators.url(message.text):
+                    twitter = message.text
+                    flag_site = 1
                 else:
-                    pass
+                    await bot.send_message(message.chat.id, 'Введите ссылку формата http://example.com')
+                    flag_site = 0
 
-                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
-                user_markup.row('Изменить тему', 'Изменить описание')
-                user_markup.row('Изменить дату', 'Изменить требования')
-                user_markup.row('Изменить сайт проекта')
-                user_markup.row('Изменить твиттер', 'Изменить дискорд')
-                user_markup.row('Изменить баннер', 'Изменить хэштеги')
-                user_markup.row(main_menu)
-                await bot.send_message(message.chat.id, 'Твиттер проекта успешно изменен!', reply_markup=user_markup)
-                await log(f"Requirements {edition_post['post_name']} is changed by {message.chat.id}")
-                set_state(message.chat.id, 13)
-            elif get_state(message.chat.id) == 190:
-                cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
-                               "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
-                               "what_needs_entities, status, message_id "
-                               f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
+            if flag_site:
+                con = sqlite3.connect(files.main_db)
+                cursor = con.cursor()
+                cursor.execute(f"UPDATE posts SET twitter = '{twitter}' "
+                               f"WHERE post_name = '{str(edition_post['post_name'])}';")
+                con.commit()
 
-                for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
-                    pic_post, name_entities, desc_entities, date_entities, \
-                    what_needs_entities, status, message_id in cursor.fetchall():
-                    with shelve.open(files.bot_message_bd) as bd:
-                        bd[str(message.chat.id)] = {
-                            'author_name': str(author_name),
-                            'post_name': str(post_name),
-                            'post_desc': str(post_desc),
-                            'post_date': str(post_date),
-                            'what_needs': str(what_needs),
-                            'site': str(site),
-                            'twitter': str(twitter),
-                            'discord': str(discord),
-                            'hashtags': str(hashtags),
-                            'pic_post': str(pic_post),
-                            'name_entities': str(name_entities),
-                            'desc_entities': str(desc_entities),
-                            'date_entities': str(date_entities),
-                            'what_needs_entities': str(what_needs_entities),
-                            'status': status,
-                            'message_id': message_id
-                        }
+                if get_state(message.chat.id) == 19:
+                    cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                                   "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                                   "what_needs_entities, status, message_id "
+                                   f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
 
-                edition_post = get_chat_value_message(message)
+                    for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
+                        pic_post, name_entities, desc_entities, date_entities, \
+                        what_needs_entities, status, message_id in cursor.fetchall():
+                        with shelve.open(files.bot_message_bd) as bd:
+                            bd[str(message.chat.id)] = {
+                                'author_name': str(author_name),
+                                'post_name': str(post_name),
+                                'post_desc': str(post_desc),
+                                'post_date': str(post_date),
+                                'what_needs': str(what_needs),
+                                'site': str(site),
+                                'twitter': str(twitter),
+                                'discord': str(discord),
+                                'hashtags': str(hashtags),
+                                'pic_post': str(pic_post),
+                                'name_entities': str(name_entities),
+                                'desc_entities': str(desc_entities),
+                                'date_entities': str(date_entities),
+                                'what_needs_entities': str(what_needs_entities),
+                                'status': status,
+                                'message_id': message_id
+                            }
 
-                if await preview(bot, message, edition_post, settings):
-                    key = InlineKeyboardMarkup()
-                    key.row(InlineKeyboardButton(text='ДА', callback_data='Редактировать пост'),
-                            InlineKeyboardButton(text='НЕТ', callback_data='Подтвердить пост'))
-                    key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
-                                                 callback_data='Вернуться в главное меню'))
-                    await bot.send_message(message.chat.id, 'Хотите ли редактировать пост?', reply_markup=key)
-                else:
+                    edition_post = get_chat_value_message(message)
+
+                    if edition_post['status']:
+                        await edit_post(bot, message, edition_post, settings, 0)
+                    else:
+                        pass
+
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                     user_markup.row('Изменить тему', 'Изменить описание')
                     user_markup.row('Изменить дату', 'Изменить требования')
@@ -1799,110 +2018,118 @@ async def in_moder_panel(bot, settings, message):
                     user_markup.row('Изменить твиттер', 'Изменить дискорд')
                     user_markup.row('Изменить баннер', 'Изменить хэштеги')
                     user_markup.row(main_menu)
-                    await bot.send_message(message.chat.id, 'Теперь выберите, что хотите изменить',
-                                           reply_markup=user_markup)
-                    set_state(message.chat.id, 130)
-            con.close()
+                    await bot.send_message(message.chat.id, 'Твиттер проекта успешно изменен!', reply_markup=user_markup)
+                    await log(f"Requirements {edition_post['post_name']} is changed by {message.chat.id}")
+                    set_state(message.chat.id, 13)
+                elif get_state(message.chat.id) == 190:
+                    cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                                   "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                                   "what_needs_entities, status, message_id "
+                                   f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
+
+                    for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
+                        pic_post, name_entities, desc_entities, date_entities, \
+                        what_needs_entities, status, message_id in cursor.fetchall():
+                        with shelve.open(files.bot_message_bd) as bd:
+                            bd[str(message.chat.id)] = {
+                                'author_name': str(author_name),
+                                'post_name': str(post_name),
+                                'post_desc': str(post_desc),
+                                'post_date': str(post_date),
+                                'what_needs': str(what_needs),
+                                'site': str(site),
+                                'twitter': str(twitter),
+                                'discord': str(discord),
+                                'hashtags': str(hashtags),
+                                'pic_post': str(pic_post),
+                                'name_entities': str(name_entities),
+                                'desc_entities': str(desc_entities),
+                                'date_entities': str(date_entities),
+                                'what_needs_entities': str(what_needs_entities),
+                                'status': status,
+                                'message_id': message_id
+                            }
+
+                    edition_post = get_chat_value_message(message)
+
+                    if await preview(bot, message, edition_post, settings):
+                        key = InlineKeyboardMarkup()
+                        key.row(InlineKeyboardButton(text='ДА', callback_data='Редактировать пост'),
+                                InlineKeyboardButton(text='НЕТ', callback_data='Подтвердить пост'))
+                        key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
+                                                     callback_data='Вернуться в главное меню'))
+                        await bot.send_message(message.chat.id, 'Хотите ли редактировать пост?', reply_markup=key)
+                    else:
+                        user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                        user_markup.row('Изменить тему', 'Изменить описание')
+                        user_markup.row('Изменить дату', 'Изменить требования')
+                        user_markup.row('Изменить сайт проекта')
+                        user_markup.row('Изменить твиттер', 'Изменить дискорд')
+                        user_markup.row('Изменить баннер', 'Изменить хэштеги')
+                        user_markup.row(main_menu)
+                        await bot.send_message(message.chat.id, 'Теперь выберите, что хотите изменить',
+                                               reply_markup=user_markup)
+                        set_state(message.chat.id, 130)
+                con.close()
 
         elif get_state(message.chat.id) in [20, 200]:
             edition_post = get_chat_value_message(message)
 
+            discord = ''
+
             if message.text == '/empty':
-                discord = ''
+                flag_site = 1
             else:
-                discord = message.text
-
-            con = sqlite3.connect(files.main_db)
-            cursor = con.cursor()
-            cursor.execute(f"UPDATE posts SET discord = '{discord}' "
-                           f"WHERE post_name = '{str(edition_post['post_name'])}';")
-            con.commit()
-
-            if get_state(message.chat.id) == 20:
-                cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
-                               "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
-                               "what_needs_entities, status, message_id "
-                               f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
-
-                for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
-                    pic_post, name_entities, desc_entities, date_entities, \
-                    what_needs_entities, status, message_id in cursor.fetchall():
-                    with shelve.open(files.bot_message_bd) as bd:
-                        bd[str(message.chat.id)] = {
-                            'author_name': str(author_name),
-                            'post_name': str(post_name),
-                            'post_desc': str(post_desc),
-                            'post_date': str(post_date),
-                            'what_needs': str(what_needs),
-                            'site': str(site),
-                            'twitter': str(twitter),
-                            'discord': str(discord),
-                            'hashtags': str(hashtags),
-                            'pic_post': str(pic_post),
-                            'name_entities': str(name_entities),
-                            'desc_entities': str(desc_entities),
-                            'date_entities': str(date_entities),
-                            'what_needs_entities': str(what_needs_entities),
-                            'status': status,
-                            'message_id': message_id
-                        }
-
-                edition_post = get_chat_value_message(message)
-
-                if edition_post['status']:
-                    await edit_post(bot, message, edition_post, settings, 0)
+                if validators.url(message.text):
+                    discord = message.text
+                    flag_site = 1
                 else:
-                    pass
+                    await bot.send_message(message.chat.id, 'Введите ссылку формата http://example.com')
+                    flag_site = 0
 
-                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
-                user_markup.row('Изменить тему', 'Изменить описание')
-                user_markup.row('Изменить дату', 'Изменить требования')
-                user_markup.row('Изменить сайт проекта')
-                user_markup.row('Изменить твиттер', 'Изменить дискорд')
-                user_markup.row('Изменить баннер', 'Изменить хэштеги')
-                user_markup.row(main_menu)
-                await bot.send_message(message.chat.id, 'Дискорд проекта успешно изменен!', reply_markup=user_markup)
-                await log(f"Requirements {edition_post['post_name']} is changed by {message.chat.id}")
-                set_state(message.chat.id, 13)
-            elif get_state(message.chat.id) == 200:
-                cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
-                               "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
-                               "what_needs_entities, status, message_id "
-                               f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
+            if flag_site:
+                con = sqlite3.connect(files.main_db)
+                cursor = con.cursor()
+                cursor.execute(f"UPDATE posts SET discord = '{discord}' "
+                               f"WHERE post_name = '{str(edition_post['post_name'])}';")
+                con.commit()
 
-                for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
-                    pic_post, name_entities, desc_entities, date_entities, \
-                    what_needs_entities, status, message_id in cursor.fetchall():
-                    with shelve.open(files.bot_message_bd) as bd:
-                        bd[str(message.chat.id)] = {
-                            'author_name': str(author_name),
-                            'post_name': str(post_name),
-                            'post_desc': str(post_desc),
-                            'post_date': str(post_date),
-                            'what_needs': str(what_needs),
-                            'site': str(site),
-                            'twitter': str(twitter),
-                            'discord': str(discord),
-                            'hashtags': str(hashtags),
-                            'pic_post': str(pic_post),
-                            'name_entities': str(name_entities),
-                            'desc_entities': str(desc_entities),
-                            'date_entities': str(date_entities),
-                            'what_needs_entities': str(what_needs_entities),
-                            'status': status,
-                            'message_id': message_id
-                        }
+                if get_state(message.chat.id) == 20:
+                    cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                                   "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                                   "what_needs_entities, status, message_id "
+                                   f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
 
-                edition_post = get_chat_value_message(message)
+                    for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
+                        pic_post, name_entities, desc_entities, date_entities, \
+                        what_needs_entities, status, message_id in cursor.fetchall():
+                        with shelve.open(files.bot_message_bd) as bd:
+                            bd[str(message.chat.id)] = {
+                                'author_name': str(author_name),
+                                'post_name': str(post_name),
+                                'post_desc': str(post_desc),
+                                'post_date': str(post_date),
+                                'what_needs': str(what_needs),
+                                'site': str(site),
+                                'twitter': str(twitter),
+                                'discord': str(discord),
+                                'hashtags': str(hashtags),
+                                'pic_post': str(pic_post),
+                                'name_entities': str(name_entities),
+                                'desc_entities': str(desc_entities),
+                                'date_entities': str(date_entities),
+                                'what_needs_entities': str(what_needs_entities),
+                                'status': status,
+                                'message_id': message_id
+                            }
 
-                if await preview(bot, message, edition_post, settings):
-                    key = InlineKeyboardMarkup()
-                    key.row(InlineKeyboardButton(text='ДА', callback_data='Редактировать пост'),
-                            InlineKeyboardButton(text='НЕТ', callback_data='Подтвердить пост'))
-                    key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
-                                                 callback_data='Вернуться в главное меню'))
-                    await bot.send_message(message.chat.id, 'Хотите ли редактировать пост?', reply_markup=key)
-                else:
+                    edition_post = get_chat_value_message(message)
+
+                    if edition_post['status']:
+                        await edit_post(bot, message, edition_post, settings, 0)
+                    else:
+                        pass
+
                     user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
                     user_markup.row('Изменить тему', 'Изменить описание')
                     user_markup.row('Изменить дату', 'Изменить требования')
@@ -1910,10 +2137,59 @@ async def in_moder_panel(bot, settings, message):
                     user_markup.row('Изменить твиттер', 'Изменить дискорд')
                     user_markup.row('Изменить баннер', 'Изменить хэштеги')
                     user_markup.row(main_menu)
-                    await bot.send_message(message.chat.id, 'Теперь выберите, что хотите изменить',
-                                           reply_markup=user_markup)
-                    set_state(message.chat.id, 130)
-            con.close()
+                    await bot.send_message(message.chat.id, 'Дискорд проекта успешно изменен!', reply_markup=user_markup)
+                    await log(f"Requirements {edition_post['post_name']} is changed by {message.chat.id}")
+                    set_state(message.chat.id, 13)
+                elif get_state(message.chat.id) == 200:
+                    cursor.execute("SELECT author_name, post_name, post_date, post_desc, what_needs, site, twitter, "
+                                   "discord, hashtags, pic_post, name_entities, desc_entities, date_entities, "
+                                   "what_needs_entities, status, message_id "
+                                   f"FROM posts WHERE post_name = '{str(edition_post['post_name'])}';")
+
+                    for author_name, post_name, post_date, post_desc, what_needs, site, twitter, discord, hashtags, \
+                        pic_post, name_entities, desc_entities, date_entities, \
+                        what_needs_entities, status, message_id in cursor.fetchall():
+                        with shelve.open(files.bot_message_bd) as bd:
+                            bd[str(message.chat.id)] = {
+                                'author_name': str(author_name),
+                                'post_name': str(post_name),
+                                'post_desc': str(post_desc),
+                                'post_date': str(post_date),
+                                'what_needs': str(what_needs),
+                                'site': str(site),
+                                'twitter': str(twitter),
+                                'discord': str(discord),
+                                'hashtags': str(hashtags),
+                                'pic_post': str(pic_post),
+                                'name_entities': str(name_entities),
+                                'desc_entities': str(desc_entities),
+                                'date_entities': str(date_entities),
+                                'what_needs_entities': str(what_needs_entities),
+                                'status': status,
+                                'message_id': message_id
+                            }
+
+                    edition_post = get_chat_value_message(message)
+
+                    if await preview(bot, message, edition_post, settings):
+                        key = InlineKeyboardMarkup()
+                        key.row(InlineKeyboardButton(text='ДА', callback_data='Редактировать пост'),
+                                InlineKeyboardButton(text='НЕТ', callback_data='Подтвердить пост'))
+                        key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
+                                                     callback_data='Вернуться в главное меню'))
+                        await bot.send_message(message.chat.id, 'Хотите ли редактировать пост?', reply_markup=key)
+                    else:
+                        user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                        user_markup.row('Изменить тему', 'Изменить описание')
+                        user_markup.row('Изменить дату', 'Изменить требования')
+                        user_markup.row('Изменить сайт проекта')
+                        user_markup.row('Изменить твиттер', 'Изменить дискорд')
+                        user_markup.row('Изменить баннер', 'Изменить хэштеги')
+                        user_markup.row(main_menu)
+                        await bot.send_message(message.chat.id, 'Теперь выберите, что хотите изменить',
+                                               reply_markup=user_markup)
+                        set_state(message.chat.id, 130)
+                con.close()
 
         elif get_state(message.chat.id) in [21, 210]:
             '''download photo'''
@@ -2185,10 +2461,152 @@ async def in_moder_panel(bot, settings, message):
             else:
                 await bot.send_message(message.chat.id, 'Такого id в списках авторов не обнаружено! '
                                                         'Выберите правильный id!')
-                set_state(message.chat.id, 22)
+                set_state(message.chat.id, 32)
+
+        elif get_state(message.chat.id) == 41:
+            if message.forward_from:
+                new_admin(message.forward_from.id, message.forward_from.username)
+                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                user_markup.row('Добавить нового админа', 'Удалить админа')
+                user_markup.row(main_menu)
+                await bot.send_message(message.chat.id, 'Новый админ успешно добавлен', reply_markup=user_markup)
+                await log(f'New admin {message.forward_from.username} is added by {message.chat.id}')
+                delete_state(message.chat.id)
+            else:
+                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                user_markup.row('Добавить нового админа', 'Удалить админа')
+                user_markup.row(main_menu)
+                await bot.send_message(message.chat.id, 'Новый админ не был добавлен\n'
+                                                        'Перешлите сообщение пользователя в бота, '
+                                                        'чтобы сделать его админом.',
+                                       reply_markup=user_markup)
+
+        elif get_state(message.chat.id) == 42:
+            admin = str(message.text)
+            admin = admin.split(' - ')
+            if int(admin[0]) in [int(admin[0]) for item in get_admin_list() if int(admin[0]) in item]:
+                try:
+                    del_id('admins', int(admin[0]))
+                except:
+                    await log('Admin was not deleted')
+                else:
+                    await bot.send_message(message.chat.id, 'Админ успешно удалён из списка')
+                    await log(f'The admin {message.text} is removed by {message.chat.id}')
+                    delete_state(message.chat.id)
+            else:
+                await bot.send_message(message.chat.id, 'Такого id в списках админов не обнаружено! '
+                                                        'Выберите правильный id!')
+                set_state(message.chat.id, 42)
+
+        elif get_state(message.chat.id) == 51:
+            if message.forward_from:
+                new_moder(message.forward_from.id, message.forward_from.username)
+                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                user_markup.row('Добавить нового модератора', 'Удалить модератора')
+                user_markup.row(main_menu)
+                await bot.send_message(message.chat.id, 'Новый модератор успешно добавлен',
+                                       reply_markup=user_markup)
+                await log(f'New moder {message.text} is added by {message.chat.id}')
+                delete_state(message.chat.id)
+            else:
+                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                user_markup.row('Добавить нового модератора', 'Удалить модератора')
+                user_markup.row(main_menu)
+                await bot.send_message(message.chat.id, 'Новый модератор не был добавлен\n'
+                                                        'Перешлите сообщение пользователя в бота, '
+                                                        'чтобы сделать его модератором.',
+                                       reply_markup=user_markup)
+
+        elif get_state(message.chat.id) == 52:
+            moder = str(message.text)
+            moder = moder.split(' - ')
+            if int(moder[0]) in [int(moder[0]) for item in get_moder_list() if int(moder[0]) in item]:
+                try:
+                    del_id('moders', int(moder[0]))
+                except:
+                    await log('Moder was not deleted')
+                else:
+                    await bot.send_message(message.chat.id, 'Модератор успешно удалён из списка')
+                    await log(f'The moder {message.text} is removed by {message.chat.id}')
+                    delete_state(message.chat.id)
+            else:
+                await bot.send_message(message.chat.id, 'Такого id в списках модеров не обнаружено! '
+                                                        'Выберите правильный id!')
+                set_state(message.chat.id, 52)
+
+        elif get_state(message.chat.id) == 61:
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            user_markup.row(f'Часовой пояс: {settings.time_zone}')
+            user_markup.row(f'Название канала: {settings.channel_name}')
+            user_markup.row(f'Порог опыта авторам: {settings.threshold_xp}')
+            user_markup.row('Изменить выводное сообщение команды /help')
+            user_markup.row('Изменить нижнюю подпись для постов')
+            user_markup.row('Скачать лог файл')
+            user_markup.row(main_menu)
+
+            settings.help_text = message.text
+            settings.help_text_entities = message
+
+            con = sqlite3.connect(files.main_db)
+            cursor = con.cursor()
+            cursor.execute(f"UPDATE phrases SET phrase_text = '{str(message.text)}', "
+                           f"phrase_text_entities = '{str(message)}' "
+                           f"WHERE phrase = 'help_text';")
+            con.commit()
+            con.close()
+
+            await bot.send_message(message.chat.id, 'Добавлено новое сообщение помощи', reply_markup=user_markup)
+            delete_state(message.chat.id)
+
+        elif get_state(message.chat.id) == 62:
+            user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            user_markup.row(f'Часовой пояс: {settings.time_zone}')
+            user_markup.row(f'Название канала: {settings.channel_name}')
+            user_markup.row(f'Порог опыта авторам: {settings.threshold_xp}')
+            user_markup.row('Изменить выводное сообщение команды /help')
+            user_markup.row('Изменить нижнюю подпись для постов')
+            user_markup.row('Скачать лог файл')
+            user_markup.row(main_menu)
+
+            settings.footer_text = message.text
+            settings.footer_text_entities = message
+
+            con = sqlite3.connect(files.main_db)
+            cursor = con.cursor()
+            cursor.execute(f"UPDATE phrases SET phrase_text = '{str(message.text)}', "
+                           f"phrase_text_entities = '{str(message)}' "
+                           f"WHERE phrase = 'footer_text';")
+            con.commit()
+            con.close()
+
+            await bot.send_message(message.chat.id, 'Добавлен новый footer', reply_markup=user_markup)
+            delete_state(message.chat.id)
+
+        elif get_state(message.chat.id) == 63:
+            if message.text.isdigit():
+                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                user_markup.row(f'Часовой пояс: {settings.time_zone}')
+                user_markup.row(f'Название канала: {settings.channel_name}')
+                user_markup.row(f'Порог опыта авторам: {settings.threshold_xp}')
+                user_markup.row('Изменить выводное сообщение команды /help')
+                user_markup.row('Изменить нижнюю подпись для постов')
+                user_markup.row('Скачать лог файл')
+                user_markup.row(main_menu)
+
+                settings.threshold_xp = int(message.text)
+
+                change_settings(settings)
+
+                await bot.send_message(message.chat.id, 'Добавлен новый порог', reply_markup=user_markup)
+                delete_state(message.chat.id)
+            else:
+                user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
+                user_markup.row(main_menu)
+
+                await bot.send_message(message.chat.id, 'Введите ЧИСЛО', reply_markup=user_markup)
 
 
-async def moder_inline(bot, callback_query, settings):
+async def admin_inline(bot, callback_query, settings):
     if callback_query.data == 'Вернуться в главное меню':
         if get_state(callback_query.message.chat.id):
             delete_state(callback_query.message.chat.id)
@@ -2198,6 +2616,7 @@ async def moder_inline(bot, callback_query, settings):
         user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
         user_markup.row('Посты')
         user_markup.row('Списки')
+        user_markup.row('Настройки бота')
 
         # удаляется старое сообщение
         await bot.delete_message(callback_query.message.chat.id, callback_query.message.message_id)
@@ -2256,7 +2675,8 @@ async def moder_inline(bot, callback_query, settings):
         key = InlineKeyboardMarkup()
         key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
                                      callback_data='Вернуться в главное меню'))
-        await bot.send_message(callback_query.message.chat.id, 'Введите ссылку на сайт проекта 🌐',
+        await bot.send_message(callback_query.message.chat.id, 'Введите ссылку на сайт проекта 🌐\n'
+                                                               '(в формате http://example.com)',
                                reply_markup=key)
 
         set_state(callback_query.message.chat.id, 5)
@@ -2279,7 +2699,8 @@ async def moder_inline(bot, callback_query, settings):
         key = InlineKeyboardMarkup()
         key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
                                      callback_data='Вернуться в главное меню'))
-        await bot.send_message(callback_query.message.chat.id, 'Введите ссылку на твиттер проекта 🐦',
+        await bot.send_message(callback_query.message.chat.id, 'Введите ссылку на твиттер проекта 🐦\n'
+                                                               '(в формате http://example.com)',
                                reply_markup=key)
 
         set_state(callback_query.message.chat.id, 6)
@@ -2302,7 +2723,8 @@ async def moder_inline(bot, callback_query, settings):
         key = InlineKeyboardMarkup()
         key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
                                      callback_data='Вернуться в главное меню'))
-        await bot.send_message(callback_query.message.chat.id, 'Введите ссылку на дискорд проекта 👾',
+        await bot.send_message(callback_query.message.chat.id, 'Введите ссылку на дискорд проекта 👾\n'
+                                                               '(в формате http://example.com)',
                                reply_markup=key)
 
         set_state(callback_query.message.chat.id, 7)
@@ -2578,7 +3000,7 @@ async def moder_inline(bot, callback_query, settings):
         user_markup = ReplyKeyboardMarkup(resize_keyboard=True)
         user_markup.row('Посты')
         user_markup.row('Списки')
-
+        user_markup.row('Настройки бота')
         await bot.send_message(callback_query.message.chat.id, 'Пост был размещен на канале.', reply_markup=user_markup)
 
         con = sqlite3.connect(files.main_db)

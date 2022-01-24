@@ -572,7 +572,7 @@ async def preview(bot, message, preview_post, settings):
                                      reply_markup=inline_status)
                 return True
     except Exception as e:
-        print(e)
+        logging.error(e)
         if str(e) == 'Media_caption_too_long':
             await bot.send_message(message.chat.id, 'Пост слишком большой, нужно его сократить.\n'
                                                     f'Сейчас количество символов: {len(text)}.\n'
@@ -833,7 +833,7 @@ async def edit_post(bot, message, edited_post, settings, edit_picture):
                                                    caption=text, caption_entities=entity_list)
                     return True
     except Exception as e:
-        print(e)
+        logging.error(e)
         if str(e) == 'Media_caption_too_long':
             await bot.send_message(message.chat.id, 'Пост слишком большой, нужно его сократить.\n'
                                                     f'Сейчас количество символов: {len(text)}.\n'
