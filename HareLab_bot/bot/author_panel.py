@@ -1,6 +1,8 @@
 import sqlite3
 import shelve
 import logging
+
+import validators
 from aiogram.utils.json import json
 
 import files
@@ -609,6 +611,7 @@ async def in_author_panel(bot, settings, message):
                                          callback_data='Вернуться в главное меню'))
             await bot.send_message(message.chat.id, 'Есть ли дата проведения события или дедлайн?',
                                    reply_markup=key)
+            delete_state(message.chat.id)
 
         elif get_state(message.chat.id) == 3:
             set_chat_value_message(message, 3)
@@ -619,6 +622,7 @@ async def in_author_panel(bot, settings, message):
             key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
                                          callback_data='Вернуться в главное меню'))
             await bot.send_message(message.chat.id, 'Нужно ли что-то сделать для участия?', reply_markup=key)
+            delete_state(message.chat.id)
 
         elif get_state(message.chat.id) in [4, 5, 6]:
             key = InlineKeyboardMarkup()
@@ -630,6 +634,7 @@ async def in_author_panel(bot, settings, message):
                 key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
                                              callback_data='Вернуться в главное меню'))
                 await bot.send_message(message.chat.id, 'Есть ли сайт у проекта?', reply_markup=key)
+                delete_state(message.chat.id)
             elif get_state(message.chat.id) == 5:
                 if validators.url(message.text):
                     set_chat_value_message(message, 5)
@@ -639,6 +644,7 @@ async def in_author_panel(bot, settings, message):
                     key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
                                                  callback_data='Вернуться в главное меню'))
                     await bot.send_message(message.chat.id, 'Есть ли твиттер у проекта?', reply_markup=key)
+                    delete_state(message.chat.id)
                 else:
                     await bot.send_message(message.chat.id, 'Введите ссылку формата http://example.com')
             elif get_state(message.chat.id) == 6:
@@ -650,6 +656,7 @@ async def in_author_panel(bot, settings, message):
                     key.add(InlineKeyboardButton(text='Отменить и вернуться в главное меню',
                                                  callback_data='Вернуться в главное меню'))
                     await bot.send_message(message.chat.id, 'Есть ли дискорд у проекта?', reply_markup=key)
+                    delete_state(message.chat.id)
                 else:
                     await bot.send_message(message.chat.id, 'Введите ссылку формата http://example.com')
 
